@@ -43,6 +43,10 @@ build/
 # macOS metadata
 .DS_Store
 
+# .NET build outputs
+cli/**/bin/
+cli/**/obj/
+
 # Dependency directories
 node_modules/
 jspm_packages/

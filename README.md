@@ -25,13 +25,13 @@ Planned tools (Roslyn-powered):
 Claude Code (MCP client)
         │  stdio
         ▼
-TypeScript MCP server   ← this repo (Node.js + @modelcontextprotocol/sdk)
-        │  child_process / CLI flags
+TypeScript MCP server   ← src/index.ts (Node.js + @modelcontextprotocol/sdk)
+        │  child_process spawn + JSON on stdout
         ▼
-.NET CLI bridge         ← planned (Roslyn workspace, outputs JSON on stdout)
+.NET CLI bridge         ← cli/DotnetContextMcp.Cli/ (Roslyn workspace)
 ```
 
-The TypeScript layer handles the MCP protocol; the .NET layer owns Roslyn so there is no need to embed C# in Node.js.
+Both layers are in this repo. The TypeScript layer handles the MCP protocol; the .NET layer owns Roslyn so there is no need to embed C# in Node.js.
 
 ## Installation
 
@@ -73,11 +73,31 @@ Expected response:
 Echo from dotnet-context-mcp: hello world
 ```
 
+## Development
+
+Build the TypeScript MCP layer:
+
+```bash
+npm run build
+```
+
+Build the .NET CLI:
+
+```bash
+dotnet build cli/DotnetContextMcp.Cli/
+```
+
+Run the .NET CLI directly (useful for testing without Claude Code):
+
+```bash
+dotnet run --project cli/DotnetContextMcp.Cli/ -- list-dbcontexts /path/to/MyApp.sln
+```
+
 ## Roadmap
 
 - [x] Project scaffold (TypeScript + MCP SDK)
 - [x] `echo` tool — sanity-check the stdio transport
-- [ ] .NET CLI bridge skeleton
+- [x] .NET CLI bridge skeleton (`cli/DotnetContextMcp.Cli/`)
 - [ ] `get_diagnostics` tool
 - [ ] `get_symbols` tool
 - [ ] `get_references` tool
