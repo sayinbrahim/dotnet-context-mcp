@@ -251,6 +251,118 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "list_migrations",
+  {
+    title: "List EF Core Migrations",
+    description:
+      "Lists all EF Core migrations found in a .NET solution, organized by DbContext. Can filter to a specific DbContext. Includes migration ID, name, timestamp, and file path.",
+    inputSchema: z.object({
+      solutionPath: z
+        .string()
+        .describe("Absolute path to the .sln file to analyze"),
+      dbContextName: z
+        .string()
+        .optional()
+        .describe("Optional: filter to a specific DbContext by name"),
+    }),
+  },
+  async ({ solutionPath, dbContextName }) => {
+    const absolutePath = resolvePath(solutionPath);
+
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: Solution file not found at ${absolutePath}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const projectRoot = resolvePath(__dirname, "..");
+    const cliProjectPath = resolvePath(projectRoot, "cli/DotnetContextMcp.Cli");
+
+    const cliArgs = [
+      "run",
+      "--project",
+      cliProjectPath,
+      "--",
+      "list-migrations",
+      absolutePath,
+    ];
+    if (dbContextName) {
+      cliArgs.push("--dbcontext", dbContextName);
+    }
+
+    const result = await new Promise<{
+      stdout: string;
+      stderr: string;
+      exitCode: number;
+    }>((resolveResult, rejectResult) => {
+      const proc = spawn("dotnet", cliArgs, { cwd: projectRoot });
+
+      let stdout = "";
+      let stderr = "";
+
+      proc.stdout.on("data", (chunk) => {
+        stdout += chunk.toString();
+      });
+      proc.stderr.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      proc.on("close", (code) => {
+        resolveResult({ stdout, stderr, exitCode: code ?? -1 });
+      });
+
+      proc.on("error", (err) => {
+        rejectResult(err);
+      });
+    });
+
+    if (result.stderr) {
+      console.error("[list_migrations] CLI stderr:", result.stderr);
+    }
+
+    if (result.exitCode !== 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: .NET CLI exited with code ${result.exitCode}\n\nStderr:\n${result.stderr}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    try {
+      const data = JSON.parse(result.stdout);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
+    } catch (parseError) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error parsing CLI output as JSON:\n\nStdout:\n${result.stdout}\n\nStderr:\n${result.stderr}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
