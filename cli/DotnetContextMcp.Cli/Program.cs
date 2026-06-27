@@ -68,7 +68,83 @@ listDbContextsCommand.SetHandler(async (string solutionPath) =>
     }
 }, solutionArg);
 
+var listEntitiesCommand = new Command("list-entities", "List EF Core entity types in a solution");
+var solutionArgForEntities = new Argument<string>("solution", "Path to .sln file");
+var dbContextOption = new Option<string?>("--dbcontext", "Filter to a specific DbContext by name");
+listEntitiesCommand.AddArgument(solutionArgForEntities);
+listEntitiesCommand.AddOption(dbContextOption);
+listEntitiesCommand.SetHandler(async (string solutionPath, string? dbContextName) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var (entities, projectsScanned, dbContextsFound) =
+                await EntityFinder.FindAsync(solution, solutionDirectory, dbContextName);
+
+            var grouped = entities
+                .GroupBy(e => new { e.DbContextName, e.DbContextNamespace })
+                .Select(g => new
+                {
+                    name = g.Key.DbContextName,
+                    @namespace = g.Key.DbContextNamespace,
+                    entities = g.Select(e => new
+                    {
+                        dbSetPropertyName = e.DbSetPropertyName,
+                        entityName = e.EntityName,
+                        entityNamespace = e.EntityNamespace,
+                        entityFilePath = e.EntityFilePath
+                    }).ToList()
+                })
+                .ToList();
+
+            var output = new
+            {
+                solution = Path.GetFileName(solutionPath),
+                solutionPath,
+                filter = dbContextName,
+                dbContexts = grouped,
+                stats = new
+                {
+                    projectsScanned,
+                    dbContextsFound,
+                    entitiesFound = entities.Count
+                }
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForEntities, dbContextOption);
+
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
+rootCommand.AddCommand(listEntitiesCommand);
 
 return await rootCommand.InvokeAsync(args);
