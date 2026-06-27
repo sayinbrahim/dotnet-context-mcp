@@ -1,61 +1,26 @@
 # dotnet-context-mcp
 
-An MCP (Model Context Protocol) server that gives AI assistants deep context about .NET codebases via Roslyn.
+[![Build](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/sayinbrahim/dotnet-context-mcp/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org)
+
+Bring deep .NET solution context to Claude Code via Roslyn-powered MCP tools.
+
+> **Status**: Early but functional. 4 tools working end-to-end. Looking for early adopters who want a better Claude Code experience on .NET projects.
 
 ## What it does
 
-| Tool | Description |
-|------|-------------|
-| `echo` | Reflects any message back to the caller — used to verify the server is wired up correctly |
-| `list_dbcontexts` | Lists all EF Core `DbContext` classes in a `.sln` file using Roslyn |
+When Claude Code works on .NET projects, it reads files one at a time and infers structure. For larger solutions, this is slow and lossy.
 
-## Tools
-
-### `echo`
-
-Echoes a message back to the caller. Used for connectivity testing.
-
-**Input**
-| Field | Type | Description |
-|-------|------|-------------|
-| `message` | string | Text to echo back |
-
-**Output** — plain text: `Echo from dotnet-context-mcp: <message>`
-
----
-
-### `list_dbcontexts`
-
-Lists all EF Core `DbContext` classes found in a .NET solution. Uses Roslyn to analyze the solution and returns class names, namespaces, project names, and file paths.
-
-**Input**
-| Field | Type | Description |
-|-------|------|-------------|
-| `solutionPath` | string | Absolute path to the `.sln` file to analyze |
-
-**Output** — JSON with the following shape:
-
-```json
-{
-  "solution": "MyApp.sln",
-  "solutionPath": "C:\\path\\to\\MyApp.sln",
-  "dbContexts": [
-    {
-      "name": "AppDbContext",
-      "namespace": "MyApp.Data",
-      "projectName": "MyApp.Data",
-      "filePath": "MyApp.Data\\AppDbContext.cs"
-    }
-  ],
-  "stats": {
-    "projectsScanned": 3,
-    "projectsWithEfCore": 1,
-    "dbContextsFound": 1
-  }
-}
-```
+This MCP server gives Claude **structured, Roslyn-backed access** to solution-level information. Questions like "what DbContexts exist", "show me entities in OrderContext", or "list migrations for ApplicationDbContext" become single tool calls instead of multi-file searches.
 
 ## Architecture
+
+Two-layer bridge MCP design:
+
+- **TypeScript MCP layer** (~300 lines): Handles MCP protocol, spawns subprocess, returns structured responses
+- **.NET CLI layer** (~600 lines C#): Uses Roslyn Workspace API to load solutions and analyze code symbolically
 
 ```
 Claude Code (MCP client)
@@ -67,11 +32,39 @@ TypeScript MCP server   ← src/index.ts (Node.js + @modelcontextprotocol/sdk)
 .NET CLI bridge         ← cli/DotnetContextMcp.Cli/ (Roslyn workspace)
 ```
 
-Both layers are in this repo. The TypeScript layer handles the MCP protocol; the .NET layer owns Roslyn so there is no need to embed C# in Node.js.
+## Available tools
+
+### `echo`
+Test tool to verify MCP connection. Echoes input back to the caller.
+
+### `list_dbcontexts`
+Lists all EF Core DbContext classes in a solution.
+- **Input**: `solutionPath` (absolute .sln path)
+- **Output**: DbContext name, namespace, project, file path
+- Filters out abstract DbContexts automatically
+- Skips projects without EF Core reference
+
+### `list_entities`
+Lists EF Core entities (`DbSet<T>` properties) across all DbContexts.
+- **Input**: `solutionPath`, optional `dbContextName` filter
+- **Output**: Entity name, namespace, file path, owning DbSet property name
+
+### `list_migrations`
+Lists EF Core migrations organized by DbContext.
+- **Input**: `solutionPath`, optional `dbContextName` filter
+- **Output**: Migration ID, name, ISO 8601 timestamp, file path
+- Migrations sorted by timestamp ASC
+- Multi-DbContext subfolder layout supported (e.g., `Migrations/SecondDb/`)
+- Stats: earliest/latest migration date, total counts
 
 ## Installation
 
-**Prerequisites:** Node.js ≥ 18, npm, .NET 8 SDK or later, Claude Code CLI.
+### Prerequisites
+- Node.js 18+
+- .NET 8 SDK
+- Claude Code 2.x
+
+### Setup
 
 ```bash
 git clone https://github.com/sayinbrahim/dotnet-context-mcp.git
@@ -80,76 +73,87 @@ npm install
 npm run build
 ```
 
-Register the server in your Claude Code config (`claude_desktop_config.json` or `.claude/settings.json`):
-
-```json
-{
-  "mcpServers": {
-    "dotnet-context-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/dotnet-context-mcp/build/index.js"]
-    }
-  }
-}
-```
-
-**Restart Claude Code** after saving the config so the new server is picked up.
-
-## Usage
-
-Once the server is running, ask Claude Code:
-
-```
-Use list_dbcontexts from dotnet-context-mcp with solutionPath C:\path\to\MyApp.sln
-```
-
-Or test connectivity:
-
-```
-Use the echo tool from dotnet-context-mcp to echo "hello world"
-```
-
-## Development
-
-Build the TypeScript MCP layer:
+Register with Claude Code:
 
 ```bash
-npm run build
+claude mcp add dotnet-context-mcp -- node /absolute/path/to/dotnet-context-mcp/build/index.js
 ```
 
-Build the .NET CLI:
+Replace `/absolute/path/to/` with your actual path. To register globally (all projects), add `-s user`:
 
 ```bash
-dotnet build cli/DotnetContextMcp.Cli/
+claude mcp add dotnet-context-mcp -s user -- node /absolute/path/to/build/index.js
 ```
 
-Run the .NET CLI directly (useful for testing without Claude Code):
+**Restart Claude Code** (start a new session). MCP servers are loaded at session start, so the tool will not appear in your current session.
+
+Verify:
 
 ```bash
-dotnet run --project cli/DotnetContextMcp.Cli/ -- list-dbcontexts /path/to/MyApp.sln
+claude mcp list
+# Should show: dotnet-context-mcp  ✔ Connected
 ```
+
+## Usage examples
+
+### Discovering DbContexts
+
+> **You**: What DbContexts exist in my solution at C:\src\MyApp\MyApp.sln?
+>
+> **Claude**: [calls list_dbcontexts] Found 2 DbContexts: ApplicationDbContext (MyApp.Data, 3 entities) and AuditDbContext (MyApp.Audit, 1 entity).
+
+### Exploring entities
+
+> **You**: Show me the entities in ApplicationDbContext.
+>
+> **Claude**: [calls list_entities with filter] ApplicationDbContext manages 3 entities: User, Order, Product. All in MyApp.Data.Entities namespace.
+
+### Reviewing migrations
+
+> **You**: What's the migration history for ApplicationDbContext?
+>
+> **Claude**: [calls list_migrations] 5 migrations:
+> 1. 20240115_InitialCreate (2024-01-15)
+> 2. 20240201_AddOrderTotal (2024-02-01)
+> 3. ...
+
+## Known limitations
+
+- **Cold start**: First call takes 10–20 seconds (`dotnet run` warmup). Subsequent calls are 5–10s. **Phase 12 will fix this** via `dotnet publish` self-contained binary (~1s response time target).
+- **.NET 10 .slnx format**: MSBuildWorkspace requires classic `.sln`. `.slnx` (.NET 10 XML format) is not yet supported.
+- **Non-ASCII paths**: Solution paths with non-ASCII characters may fail. Use ASCII-only paths for now.
 
 ## Roadmap
 
-- [x] Project scaffold (TypeScript + MCP SDK)
-- [x] `echo` tool — sanity-check the stdio transport
-- [x] .NET CLI bridge skeleton (`cli/DotnetContextMcp.Cli/`)
-- [x] `list_dbcontexts` — Roslyn-based EF Core DbContext discovery wired to MCP
-- [ ] `get_dbcontext_schema` — return full entity/property model for a given DbContext
-- [ ] `list_migrations` — enumerate applied and pending EF Core migrations
-- [ ] `get_diagnostics` tool
-- [ ] `get_symbols` tool
+### Done
+- [x] Phase 1–5: MCP scaffold, Roslyn integration, list_dbcontexts
+- [x] Phase 6: list_entities with optional filtering
+- [x] Phase 7: list_migrations with metadata extraction
 
-## Known Limitations
+### Next
+- [ ] Phase 8: analyze_migration (single migration detail with operations)
+- [ ] Phase 9: find_relationships (entity navigation properties)
+- [ ] Phase 10: find_dbcontext_dependencies (DI graph)
+- [ ] Phase 11: analyze_solution_health (overall report)
+- [ ] Phase 12: `dotnet publish` for fast cold start
+- [ ] Phase 13: Publish as npm package (`npx dotnet-context-mcp`)
+- [ ] Phase 14: Documentation site
+- [ ] Phase 15: VS Code extension installer
 
-- **Cold start**: The first `dotnet run` call takes 10–20 seconds while the CLI project compiles. Subsequent calls within the same process are faster.
-- **.NET 10 `.slnx` format not supported**: Only the classic `.sln` format is recognized. `.slnx` (SDK-style solution files introduced in .NET 10) will cause an error.
-- **Non-ASCII paths**: Solution paths containing non-ASCII characters may cause issues depending on the system locale and .NET runtime version.
+## Contributing
 
-## Tested With
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and PR guidelines.
 
-- `TestApp.sln` — synthetic solution with project `TestApp.Data` containing 2 DbContext classes (`TestDbContext`, `SecondDbContext`). Verified end-to-end via Claude Code on 2026-06-27.
+## Support
+
+- [GitHub Issues](https://github.com/sayinbrahim/dotnet-context-mcp/issues) for bugs
+- [Discussions](https://github.com/sayinbrahim/dotnet-context-mcp/discussions) for questions
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE) for details.
+
+## Author
+
+Built by [Halil İbrahim Sayın](https://github.com/sayinbrahim) — Senior .NET Developer at Enerjisa, Ankara.  
+Contact: [LinkedIn](https://www.linkedin.com/in/halil-ibrahim-say%C4%B1n-0a8760115/)
