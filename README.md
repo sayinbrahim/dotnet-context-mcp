@@ -4,10 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/dotnet-context-mcp.svg)](https://www.npmjs.com/package/dotnet-context-mcp)
+[![npm downloads](https://img.shields.io/npm/dt/dotnet-context-mcp.svg)](https://www.npmjs.com/package/dotnet-context-mcp)
 
 Bring deep .NET solution context to Claude Code via Roslyn-powered MCP tools.
 
-> **Status**: Early but functional. 4 tools working end-to-end. Looking for early adopters who want a better Claude Code experience on .NET projects.
+> **Status**: v0.1.0 published to npm. 4 tools working end-to-end. Looking for early adopters and feedback. PRs welcome.
 
 ## What it does
 
@@ -70,41 +72,51 @@ Lists EF Core migrations organized by DbContext.
 
 ## Installation
 
-### Prerequisites
-- Node.js 18+
-- .NET 8 SDK (required on the machine running the server — used by Roslyn to locate MSBuild)
-- Claude Code 2.x
-
-### Setup
+### Quick install (recommended)
 
 ```bash
-git clone https://github.com/sayinbrahim/dotnet-context-mcp.git
-cd dotnet-context-mcp
-npm install
-npm run build        # compile TypeScript
-npm run build:cli    # publish .NET binary for your platform (win-x64 default)
+claude mcp add dotnet-context-mcp -s user -- npx -y dotnet-context-mcp@latest
 ```
 
-Register with Claude Code:
+The `-s user` flag makes this MCP server available globally across all your projects. For project-specific install, omit the flag.
 
-```bash
-claude mcp add dotnet-context-mcp -- node /absolute/path/to/dotnet-context-mcp/build/index.js
-```
+Restart Claude Code (`/exit`, then `claude`) to load the new MCP server.
 
-Replace `/absolute/path/to/` with your actual path. To register globally (all projects), add `-s user`:
-
-```bash
-claude mcp add dotnet-context-mcp -s user -- node /absolute/path/to/build/index.js
-```
-
-**Restart Claude Code** (start a new session). MCP servers are loaded at session start, so the tool will not appear in your current session.
-
-Verify:
+Verify the server is connected:
 
 ```bash
 claude mcp list
 # Should show: dotnet-context-mcp  ✔ Connected
 ```
+
+The first tool call may take 5-15 seconds (npm fetches the package and downloads the platform-specific binary). Subsequent calls are 3-4 seconds.
+
+### Platform support
+
+Pre-built binaries are automatically downloaded for:
+- Windows x64
+- Linux x64
+- macOS Intel (x64)
+- macOS Apple Silicon (arm64)
+
+### Requirements
+
+- Node.js 18+
+- Claude Code 2.x
+- .NET 8 SDK installed on your machine (required for Roslyn's MSBuildLocator)
+- `tar` command (built-in on macOS/Linux; available on Windows 10+)
+
+### From source (developers)
+
+```bash
+git clone https://github.com/sayinbrahim/dotnet-context-mcp.git
+cd dotnet-context-mcp
+npm install
+npm run build:all  # TypeScript + Windows binary
+claude mcp add dotnet-context-mcp -- node /absolute/path/to/build/index.js
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup details.
 
 ## Usage examples
 
@@ -143,6 +155,7 @@ claude mcp list
 - [x] Phase 6: list_entities with optional filtering
 - [x] Phase 7: list_migrations with metadata extraction
 - [x] Phase 12.1–12.3: Self-contained binary publish (5-6x cold-start improvement, 4 platforms)
+- [x] Phase 13: Published as npm package (`npx dotnet-context-mcp`) — v0.1.0 live on npm
 
 ### Next
 - [ ] Phase 8: analyze_migration (single migration detail with operations)
@@ -150,7 +163,6 @@ claude mcp list
 - [ ] Phase 10: find_dbcontext_dependencies (DI graph)
 - [ ] Phase 11: analyze_solution_health (overall report)
 - [ ] Phase 12.4: Hermetic binary (no .NET SDK required on target)
-- [ ] Phase 13: Publish as npm package (`npx dotnet-context-mcp`)
 - [ ] Phase 14: Documentation site
 - [ ] Phase 15: VS Code extension installer
 
