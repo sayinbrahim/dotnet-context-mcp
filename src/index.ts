@@ -10,6 +10,93 @@ import { dirname } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function resolveCliCommand(projectRoot: string): { command: string; baseArgs: string[]; cwd: string } {
+  const platform = process.platform;
+  const arch = process.arch;
+
+  let rid: string;
+  let exeName: string;
+
+  if (platform === "win32") {
+    rid = "win-x64";
+    exeName = "DotnetContextMcp.Cli.exe";
+  } else if (platform === "linux") {
+    rid = "linux-x64";
+    exeName = "DotnetContextMcp.Cli";
+  } else if (platform === "darwin") {
+    rid = arch === "arm64" ? "osx-arm64" : "osx-x64";
+    exeName = "DotnetContextMcp.Cli";
+  } else {
+    throw new Error(`Unsupported platform: ${platform}-${arch}`);
+  }
+
+  const binaryPath = resolvePath(projectRoot, "build/cli", rid, exeName);
+
+  if (existsSync(binaryPath)) {
+    return {
+      command: binaryPath,
+      baseArgs: [],
+      cwd: projectRoot,
+    };
+  }
+
+  // Fallback: dotnet run (developer mode, slow but works without a published binary)
+  console.error(
+    `[dotnet-context-mcp] Binary not found at ${binaryPath}, falling back to 'dotnet run'. Run 'npm run build:cli' to build the binary for faster startup.`
+  );
+  const cliProjectPath = resolvePath(projectRoot, "cli/DotnetContextMcp.Cli");
+  return {
+    command: "dotnet",
+    baseArgs: ["run", "--project", cliProjectPath, "--"],
+    cwd: projectRoot,
+  };
+}
+
+async function callCli(
+  subcommand: string,
+  subcommandArgs: string[],
+  toolName: string
+): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
+  const projectRoot = resolvePath(__dirname, "..");
+  const { command, baseArgs, cwd } = resolveCliCommand(projectRoot);
+  const allArgs = [...baseArgs, subcommand, ...subcommandArgs];
+
+  const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>(
+    (resolveResult, rejectResult) => {
+      const proc = spawn(command, allArgs, { cwd });
+      let stdout = "";
+      let stderr = "";
+      proc.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+      proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+      proc.on("close", (code) => { resolveResult({ stdout, stderr, exitCode: code ?? -1 }); });
+      proc.on("error", (err) => { rejectResult(err); });
+    }
+  );
+
+  if (result.stderr) {
+    console.error(`[${toolName}] CLI stderr:`, result.stderr);
+  }
+
+  if (result.exitCode !== 0) {
+    return {
+      content: [{ type: "text", text: `Error: .NET CLI exited with code ${result.exitCode}\n\nStderr:\n${result.stderr}` }],
+      isError: true,
+    };
+  }
+
+  try {
+    const data = JSON.parse(result.stdout);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  } catch {
+    return {
+      content: [{ type: "text", text: `Error parsing CLI output as JSON:\n\nStdout:\n${result.stdout}\n\nStderr:\n${result.stderr}` }],
+      isError: true,
+    };
+  }
+}
+
 const server = new McpServer({
   name: "dotnet-context-mcp",
   version: "0.1.0",
@@ -50,90 +137,13 @@ server.registerTool(
   },
   async ({ solutionPath }) => {
     const absolutePath = resolvePath(solutionPath);
-
     if (!existsSync(absolutePath)) {
       return {
-        content: [
-          {
-            type: "text",
-            text: `Error: Solution file not found at ${absolutePath}`,
-          },
-        ],
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
         isError: true,
       };
     }
-
-    // build/index.js lives one level inside the repo root
-    const projectRoot = resolvePath(__dirname, "..");
-    const cliProjectPath = resolvePath(projectRoot, "cli/DotnetContextMcp.Cli");
-
-    const result = await new Promise<{
-      stdout: string;
-      stderr: string;
-      exitCode: number;
-    }>((resolveResult, rejectResult) => {
-      const proc = spawn(
-        "dotnet",
-        ["run", "--project", cliProjectPath, "--", "list-dbcontexts", absolutePath],
-        { cwd: projectRoot }
-      );
-
-      let stdout = "";
-      let stderr = "";
-
-      proc.stdout.on("data", (chunk) => {
-        stdout += chunk.toString();
-      });
-      proc.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
-      });
-
-      proc.on("close", (code) => {
-        resolveResult({ stdout, stderr, exitCode: code ?? -1 });
-      });
-
-      proc.on("error", (err) => {
-        rejectResult(err);
-      });
-    });
-
-    if (result.stderr) {
-      console.error("[list_dbcontexts] CLI stderr:", result.stderr);
-    }
-
-    if (result.exitCode !== 0) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error: .NET CLI exited with code ${result.exitCode}\n\nStderr:\n${result.stderr}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    try {
-      const data = JSON.parse(result.stdout);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(data, null, 2),
-          },
-        ],
-      };
-    } catch {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error parsing CLI output as JSON:\n\nStdout:\n${result.stdout}\n\nStderr:\n${result.stderr}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+    return callCli("list-dbcontexts", [absolutePath], "list_dbcontexts");
   }
 );
 
@@ -157,97 +167,15 @@ server.registerTool(
   },
   async ({ solutionPath, dbContextName }) => {
     const absolutePath = resolvePath(solutionPath);
-
     if (!existsSync(absolutePath)) {
       return {
-        content: [
-          {
-            type: "text",
-            text: `Error: Solution file not found at ${absolutePath}`,
-          },
-        ],
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
         isError: true,
       };
     }
-
-    const projectRoot = resolvePath(__dirname, "..");
-    const cliProjectPath = resolvePath(projectRoot, "cli/DotnetContextMcp.Cli");
-
-    const cliArgs = [
-      "run",
-      "--project",
-      cliProjectPath,
-      "--",
-      "list-entities",
-      absolutePath,
-    ];
-    if (dbContextName) {
-      cliArgs.push("--dbcontext", dbContextName);
-    }
-
-    const result = await new Promise<{
-      stdout: string;
-      stderr: string;
-      exitCode: number;
-    }>((resolveResult, rejectResult) => {
-      const proc = spawn("dotnet", cliArgs, { cwd: projectRoot });
-
-      let stdout = "";
-      let stderr = "";
-
-      proc.stdout.on("data", (chunk) => {
-        stdout += chunk.toString();
-      });
-      proc.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
-      });
-
-      proc.on("close", (code) => {
-        resolveResult({ stdout, stderr, exitCode: code ?? -1 });
-      });
-
-      proc.on("error", (err) => {
-        rejectResult(err);
-      });
-    });
-
-    if (result.stderr) {
-      console.error("[list_entities] CLI stderr:", result.stderr);
-    }
-
-    if (result.exitCode !== 0) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error: .NET CLI exited with code ${result.exitCode}\n\nStderr:\n${result.stderr}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    try {
-      const data = JSON.parse(result.stdout);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(data, null, 2),
-          },
-        ],
-      };
-    } catch (parseError) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error parsing CLI output as JSON:\n\nStdout:\n${result.stdout}\n\nStderr:\n${result.stderr}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+    const args = [absolutePath];
+    if (dbContextName) args.push("--dbcontext", dbContextName);
+    return callCli("list-entities", args, "list_entities");
   }
 );
 
@@ -269,97 +197,15 @@ server.registerTool(
   },
   async ({ solutionPath, dbContextName }) => {
     const absolutePath = resolvePath(solutionPath);
-
     if (!existsSync(absolutePath)) {
       return {
-        content: [
-          {
-            type: "text",
-            text: `Error: Solution file not found at ${absolutePath}`,
-          },
-        ],
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
         isError: true,
       };
     }
-
-    const projectRoot = resolvePath(__dirname, "..");
-    const cliProjectPath = resolvePath(projectRoot, "cli/DotnetContextMcp.Cli");
-
-    const cliArgs = [
-      "run",
-      "--project",
-      cliProjectPath,
-      "--",
-      "list-migrations",
-      absolutePath,
-    ];
-    if (dbContextName) {
-      cliArgs.push("--dbcontext", dbContextName);
-    }
-
-    const result = await new Promise<{
-      stdout: string;
-      stderr: string;
-      exitCode: number;
-    }>((resolveResult, rejectResult) => {
-      const proc = spawn("dotnet", cliArgs, { cwd: projectRoot });
-
-      let stdout = "";
-      let stderr = "";
-
-      proc.stdout.on("data", (chunk) => {
-        stdout += chunk.toString();
-      });
-      proc.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
-      });
-
-      proc.on("close", (code) => {
-        resolveResult({ stdout, stderr, exitCode: code ?? -1 });
-      });
-
-      proc.on("error", (err) => {
-        rejectResult(err);
-      });
-    });
-
-    if (result.stderr) {
-      console.error("[list_migrations] CLI stderr:", result.stderr);
-    }
-
-    if (result.exitCode !== 0) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error: .NET CLI exited with code ${result.exitCode}\n\nStderr:\n${result.stderr}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    try {
-      const data = JSON.parse(result.stdout);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(data, null, 2),
-          },
-        ],
-      };
-    } catch (parseError) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error parsing CLI output as JSON:\n\nStdout:\n${result.stdout}\n\nStderr:\n${result.stderr}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+    const args = [absolutePath];
+    if (dbContextName) args.push("--dbcontext", dbContextName);
+    return callCli("list-migrations", args, "list_migrations");
   }
 );
 

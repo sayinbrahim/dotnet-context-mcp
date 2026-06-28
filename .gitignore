@@ -40,6 +40,9 @@ build/Release
 # TypeScript build output
 build/
 
+# Published .NET CLI binaries (large, OS-specific, reproducible via npm run build:cli)
+build/cli/
+
 # macOS metadata
 .DS_Store
 
