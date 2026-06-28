@@ -20,7 +20,10 @@ jobs:
 
       - name: Get version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $env:GITHUB_OUTPUT
+        run: |
+          $version = $env:GITHUB_REF -replace "^refs/tags/", ""
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Tag version: $version"
         shell: pwsh
 
       - name: Build all platform binaries
