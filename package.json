@@ -15,10 +15,11 @@
   },
   "type": "module",
   "bin": {
-    "dotnet-context-mcp": "./build/index.js"
+    "dotnet-context-mcp": "./bin/dotnet-context-mcp.js"
   },
   "main": "./build/index.js",
   "files": [
+    "bin/",
     "build/index.js",
     "build/index.js.map",
     "scripts/download-binary.js",
