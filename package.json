@@ -1,35 +1,50 @@
 {
   "name": "dotnet-context-mcp",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "description": "MCP server bringing Roslyn-powered .NET solution context to Claude Code",
+  "keywords": ["mcp", "claude", "claude-code", "dotnet", "roslyn", "ef-core", "model-context-protocol"],
+  "author": "Halil İbrahim Sayın <sayinhalil23@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sayinbrahim/dotnet-context-mcp.git"
+  },
+  "homepage": "https://github.com/sayinbrahim/dotnet-context-mcp",
+  "bugs": {
+    "url": "https://github.com/sayinbrahim/dotnet-context-mcp/issues"
+  },
+  "type": "module",
+  "bin": {
+    "dotnet-context-mcp": "./build/index.js"
+  },
+  "main": "./build/index.js",
+  "files": [
+    "build/index.js",
+    "build/index.js.map",
+    "scripts/download-binary.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "build:cli": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-single.ps1",
     "build:cli:all": "powershell -ExecutionPolicy Bypass -File ./scripts/publish.ps1",
     "build:all": "npm run build && npm run build:cli",
+    "postinstall": "node scripts/download-binary.js",
     "start": "node build/index.js",
-    "dev": "tsc && node build/index.js"
+    "dev": "tsc && node build/index.js",
+    "prepublishOnly": "npm run build"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sayinbrahim/dotnet-context-mcp.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
-  "bugs": {
-    "url": "https://github.com/sayinbrahim/dotnet-context-mcp/issues"
-  },
-  "homepage": "https://github.com/sayinbrahim/dotnet-context-mcp#readme",
-  "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.22.0",
-    "@types/node": "^26.0.1",
-    "typescript": "^6.0.3"
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.22.0",
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
   }
 }

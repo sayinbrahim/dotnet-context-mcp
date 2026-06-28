@@ -1,0 +1,13 @@
+# Exclude everything not in the "files" whitelist in package.json.
+# These are explicit safety excludes in case the whitelist is loosened.
+
+cli/
+build/cli/
+scripts/publish.ps1
+scripts/publish-single.ps1
+.github/
+tests/
+*.log
+node_modules/
+src/
+tsconfig.json
