@@ -1,0 +1,51 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build all platform binaries
+        run: |
+          $rids = @("win-x64", "linux-x64", "osx-x64", "osx-arm64")
+          foreach ($rid in $rids) {
+            Write-Host "Publishing $rid..."
+            dotnet publish ./cli/DotnetContextMcp.Cli -c Release -r $rid --self-contained true -o "./build/cli/$rid"
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+        shell: pwsh
+
+      - name: Create archives
+        run: |
+          $rids = @("win-x64", "linux-x64", "osx-x64", "osx-arm64")
+          foreach ($rid in $rids) {
+            $archiveName = "dotnet-context-mcp-${{ steps.version.outputs.VERSION }}-$rid.tar.gz"
+            Write-Host "Creating $archiveName..."
+            tar -czf "./build/$archiveName" -C "./build/cli/$rid" .
+          }
+        shell: pwsh
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./build/dotnet-context-mcp-*.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: false
