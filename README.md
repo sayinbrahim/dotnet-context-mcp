@@ -57,11 +57,22 @@ Lists EF Core migrations organized by DbContext.
 - Multi-DbContext subfolder layout supported (e.g., `Migrations/SecondDb/`)
 - Stats: earliest/latest migration date, total counts
 
+## Platform support
+
+| Platform | RID | Status |
+|---|---|---|
+| Windows x64 | `win-x64` | Tested |
+| Linux x64 | `linux-x64` | Binary built, untested in production |
+| macOS x64 (Intel) | `osx-x64` | Binary built, untested in production |
+| macOS ARM64 (Apple Silicon) | `osx-arm64` | Binary built, untested in production |
+
+**Current limitation:** `Microsoft.Build.Locator` requires a .NET 8 SDK to be installed on the target machine to locate MSBuild. Truly hermetic operation (no SDK required) is deferred to a future phase.
+
 ## Installation
 
 ### Prerequisites
 - Node.js 18+
-- .NET 8 SDK
+- .NET 8 SDK (required on the machine running the server — used by Roslyn to locate MSBuild)
 - Claude Code 2.x
 
 ### Setup
@@ -70,7 +81,8 @@ Lists EF Core migrations organized by DbContext.
 git clone https://github.com/sayinbrahim/dotnet-context-mcp.git
 cd dotnet-context-mcp
 npm install
-npm run build
+npm run build        # compile TypeScript
+npm run build:cli    # publish .NET binary for your platform (win-x64 default)
 ```
 
 Register with Claude Code:
@@ -119,7 +131,8 @@ claude mcp list
 
 ## Known limitations
 
-- **Cold start**: First call takes 10–20 seconds (`dotnet run` warmup). Subsequent calls are 5–10s. **Phase 12 will fix this** via `dotnet publish` self-contained binary (~1s response time target).
+- **Cold start**: First call takes 3–4 seconds (self-contained binary warm-up). Previously 15–20s with `dotnet run`.
+- **.NET SDK required**: `MSBuildLocator` must find a .NET 8 SDK on the target machine. Hermetic operation is a future phase.
 - **.NET 10 .slnx format**: MSBuildWorkspace requires classic `.sln`. `.slnx` (.NET 10 XML format) is not yet supported.
 - **Non-ASCII paths**: Solution paths with non-ASCII characters may fail. Use ASCII-only paths for now.
 
@@ -129,13 +142,14 @@ claude mcp list
 - [x] Phase 1–5: MCP scaffold, Roslyn integration, list_dbcontexts
 - [x] Phase 6: list_entities with optional filtering
 - [x] Phase 7: list_migrations with metadata extraction
+- [x] Phase 12.1–12.3: Self-contained binary publish (5-6x cold-start improvement, 4 platforms)
 
 ### Next
 - [ ] Phase 8: analyze_migration (single migration detail with operations)
 - [ ] Phase 9: find_relationships (entity navigation properties)
 - [ ] Phase 10: find_dbcontext_dependencies (DI graph)
 - [ ] Phase 11: analyze_solution_health (overall report)
-- [ ] Phase 12: `dotnet publish` for fast cold start
+- [ ] Phase 12.4: Hermetic binary (no .NET SDK required on target)
 - [ ] Phase 13: Publish as npm package (`npx dotnet-context-mcp`)
 - [ ] Phase 14: Documentation site
 - [ ] Phase 15: VS Code extension installer

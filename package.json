@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "build:cli": "powershell -ExecutionPolicy Bypass -File ./scripts/publish.ps1",
+    "build:cli": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-single.ps1",
+    "build:cli:all": "powershell -ExecutionPolicy Bypass -File ./scripts/publish.ps1",
     "build:all": "npm run build && npm run build:cli",
     "start": "node build/index.js",
     "dev": "tsc && node build/index.js"
