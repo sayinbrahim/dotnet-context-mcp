@@ -1,0 +1,29 @@
+# Changelog
+
+## v0.1.1 (2026-06-29)
+
+### Added
+- `analyze_migration` tool — returns detailed Up/Down operations for a specific migration including:
+  - CreateTable, DropTable with full column metadata (name, type, nullable, isPrimaryKey)
+  - AddColumn, DropColumn, AlterColumn
+  - CreateIndex, DropIndex (including unique indexes)
+  - AddForeignKey, DropForeignKey with ReferentialAction (onDelete)
+  - AddPrimaryKey, DropPrimaryKey
+  - RenameColumn, RenameTable
+  - Raw Sql execution (truncated preview)
+- Roslyn syntax-level analysis (parses Up()/Down() method bodies via SyntaxNode walking)
+- Anonymous object parsing for CreateTable columns lambda
+- Primary key detection from constraints lambda
+- Operation summary with per-type counts (tablesCreated, columnsAdded, indexesCreated, etc.)
+
+### Notes
+- When .NET CLI source changes locally, run `npm run build:cli` to refresh the published binary.
+  The TypeScript layer prefers the published binary over `dotnet run` for performance.
+
+## v0.1.0 (2026-06-28)
+
+### Added
+- Initial release with 4 MCP tools: echo, list_dbcontexts, list_entities, list_migrations
+- Bridge MCP architecture (TypeScript MCP server + .NET CLI for Roslyn analysis)
+- Cross-platform binaries (win-x64, linux-x64, osx-x64, osx-arm64)
+- npm package with post-install platform binary download

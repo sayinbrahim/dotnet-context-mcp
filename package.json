@@ -1,8 +1,16 @@
 {
   "name": "dotnet-context-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server bringing Roslyn-powered .NET solution context to Claude Code",
-  "keywords": ["mcp", "claude", "claude-code", "dotnet", "roslyn", "ef-core", "model-context-protocol"],
+  "keywords": [
+    "mcp",
+    "claude",
+    "claude-code",
+    "dotnet",
+    "roslyn",
+    "ef-core",
+    "model-context-protocol"
+  ],
   "author": "Halil İbrahim Sayın <sayinhalil23@gmail.com>",
   "license": "MIT",
   "repository": {
