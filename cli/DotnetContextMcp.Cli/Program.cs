@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Build.Locator;
 using DotnetContextMcp.Cli.Analysis;
 
@@ -9,6 +10,7 @@ var jsonOptions = new JsonSerializerOptions
 {
     WriteIndented = true,
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 };
 
 var solutionArg = new Argument<string>("solution", "Path to .sln file");
@@ -231,9 +233,80 @@ listMigrationsCommand.SetHandler(async (string solutionPath, string? dbContextNa
     }
 }, solutionArgForMigrations, dbContextOptionForMigrations);
 
+var analyzeMigrationCommand = new Command("analyze-migration", "Analyze Up/Down operations in a specific EF Core migration");
+var solutionArgForAnalyze = new Argument<string>("solution", "Path to .sln file");
+var migrationIdArg = new Argument<string>("migrationId", "Migration ID (e.g. 20260627141537_InitialCreate)");
+analyzeMigrationCommand.AddArgument(solutionArgForAnalyze);
+analyzeMigrationCommand.AddArgument(migrationIdArg);
+analyzeMigrationCommand.SetHandler(async (string solutionPath, string migrationId) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var analyzed = await MigrationOperationAnalyzer.AnalyzeAsync(solution, solutionDirectory, migrationId);
+
+            if (analyzed is null)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    error = "Migration not found",
+                    migrationId
+                }, jsonOptions));
+                Environment.Exit(1);
+                return;
+            }
+
+            var output = new
+            {
+                migration = new
+                {
+                    id = analyzed.MigrationId,
+                    name = analyzed.MigrationName,
+                    dbContext = analyzed.OwningDbContext,
+                    filePath = analyzed.FilePath
+                },
+                upOperations = analyzed.UpOperations,
+                downOperations = analyzed.DownOperations,
+                summary = analyzed.Summary
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForAnalyze, migrationIdArg);
+
+
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
 rootCommand.AddCommand(listEntitiesCommand);
 rootCommand.AddCommand(listMigrationsCommand);
+rootCommand.AddCommand(analyzeMigrationCommand);
 
 return await rootCommand.InvokeAsync(args);

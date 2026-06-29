@@ -209,6 +209,35 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "analyze_migration",
+  {
+    title: "Analyze EF Core Migration",
+    description:
+      "Returns the detailed Up/Down operations of a specific EF Core migration. Includes operation type (CreateTable, AddColumn, AlterColumn, CreateIndex, AddForeignKey, etc.), affected tables/columns, and a summary count by operation type. Use this after list_migrations to inspect what a particular migration actually does.",
+    inputSchema: z.object({
+      solutionPath: z
+        .string()
+        .describe("Absolute path to the .sln file to analyze"),
+      migrationId: z
+        .string()
+        .describe(
+          "The migration ID to analyze (e.g., '20260627141537_InitialCreate'). Get this from list_migrations output."
+        ),
+    }),
+  },
+  async ({ solutionPath, migrationId }) => {
+    const absolutePath = resolvePath(solutionPath);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+    return callCli("analyze-migration", [absolutePath, migrationId], "analyze_migration");
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
