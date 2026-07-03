@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.3 (2026-07-04)
+
+### Changed
+- Documentation refresh:
+  - Updated tools table to reflect all 6 tools (added `analyze_migration` and `find_relationships` details)
+  - Added Usage Examples section with concrete Claude Code prompts
+  - Fixed broken CI badge (was referencing non-existent workflow)
+  - Updated architecture diagram
+  - Refreshed roadmap (Phase 8, 9 complete; Phase 10, 11, 12 planned)
+
+### Notes
+- No code changes in this release — same functionality as v0.1.2
+
 ## v0.1.2 (2026-07-03)
 
 ### Added
