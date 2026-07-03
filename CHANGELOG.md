@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.2 (2026-07-03)
+
+### Added
+- `find_relationships` MCP tool — analyzes entity navigation
+  properties and foreign keys, returns relationship graph with:
+  - Detected relationship types (OneToMany, ManyToOne, OneToOne, ManyToMany)
+  - Foreign key property names
+  - Required/optional flag from nullability + [Required] attribute
+  - Cascade behavior when available
+  - Detection source tracking (Navigation / Convention / DataAnnotation / FluentApi)
+- Convention-based FK detection (naming pattern like "UserId" → User)
+- Fluent API parsing in OnModelCreating (HasOne/HasMany chains)
+- Data annotation support ([ForeignKey], [InverseProperty])
+- `--entity` filter for scoped queries
+
 ## v0.1.1 (2026-06-29)
 
 ### Added

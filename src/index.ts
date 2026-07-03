@@ -238,6 +238,34 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "find_relationships",
+  {
+    title: "Find Entity Relationships",
+    description:
+      "Returns navigation properties, foreign keys, and relationship types (OneToMany, ManyToOne, OneToOne, ManyToMany) between entities in a specific DbContext. Detects conventions, data annotations, and fluent API configurations.",
+    inputSchema: z.object({
+      solutionPath: z.string().describe("Absolute path to the .sln file"),
+      dbContextName: z.string().describe("The DbContext to analyze (e.g., 'TestDbContext')"),
+      entity: z.string().optional().describe("Filter to a specific entity name"),
+    }),
+  },
+  async ({ solutionPath, dbContextName, entity }) => {
+    const absolutePath = resolvePath(solutionPath);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+
+    const args = [absolutePath, dbContextName];
+    if (entity) args.push("--entity", entity);
+
+    return callCli("list-relationships", args, "find_relationships");
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 

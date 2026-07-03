@@ -303,10 +303,95 @@ analyzeMigrationCommand.SetHandler(async (string solutionPath, string migrationI
 }, solutionArgForAnalyze, migrationIdArg);
 
 
+var listRelationshipsCommand = new Command("list-relationships", "List EF Core entity relationships (navigation properties, foreign keys) in a solution");
+var solutionArgForRelationships = new Argument<string>("solution", "Path to .sln file");
+var dbContextArgForRelationships = new Argument<string>("dbcontext", "DbContext name to analyze relationships for");
+var entityOptionForRelationships = new Option<string?>("--entity", "Filter to a specific entity by name");
+listRelationshipsCommand.AddArgument(solutionArgForRelationships);
+listRelationshipsCommand.AddArgument(dbContextArgForRelationships);
+listRelationshipsCommand.AddOption(entityOptionForRelationships);
+listRelationshipsCommand.SetHandler(async (string solutionPath, string dbContextName, string? entityName) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var (dbContexts, _, _) = await DbContextFinder.FindAsync(solution, solutionDirectory);
+            if (!dbContexts.Any(d => d.Name == dbContextName))
+            {
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    error = "DbContext not found",
+                    details = $"No DbContext named '{dbContextName}' was found in the solution. Available: {string.Join(", ", dbContexts.Select(d => d.Name))}"
+                }, jsonOptions));
+                Environment.Exit(1);
+                return;
+            }
+
+            var finder = new RelationshipFinder();
+            var relationships = finder.Find(solution, dbContextName, entityName);
+
+            var byType = new Dictionary<string, int>
+            {
+                ["OneToMany"] = relationships.Count(r => r.RelationshipType == "OneToMany"),
+                ["ManyToOne"] = relationships.Count(r => r.RelationshipType == "ManyToOne"),
+                ["OneToOne"] = relationships.Count(r => r.RelationshipType == "OneToOne"),
+                ["ManyToMany"] = relationships.Count(r => r.RelationshipType == "ManyToMany")
+            };
+
+            var output = new
+            {
+                solution = Path.GetFileName(solutionPath),
+                dbContextName,
+                filter = new
+                {
+                    entity = entityName
+                },
+                relationships,
+                stats = new
+                {
+                    totalRelationships = relationships.Count,
+                    entitiesAnalyzed = finder.EntitiesAnalyzed,
+                    byType
+                }
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForRelationships, dbContextArgForRelationships, entityOptionForRelationships);
+
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
 rootCommand.AddCommand(listEntitiesCommand);
 rootCommand.AddCommand(listMigrationsCommand);
 rootCommand.AddCommand(analyzeMigrationCommand);
+rootCommand.AddCommand(listRelationshipsCommand);
 
 return await rootCommand.InvokeAsync(args);
