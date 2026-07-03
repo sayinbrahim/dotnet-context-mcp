@@ -1,63 +1,54 @@
 # dotnet-context-mcp
 
-[![Build](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/sayinbrahim/dotnet-context-mcp/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![.NET 8](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org)
 [![npm version](https://img.shields.io/npm/v/dotnet-context-mcp.svg)](https://www.npmjs.com/package/dotnet-context-mcp)
 [![npm downloads](https://img.shields.io/npm/dt/dotnet-context-mcp.svg)](https://www.npmjs.com/package/dotnet-context-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Release](https://img.shields.io/github/v/release/sayinbrahim/dotnet-context-mcp)](https://github.com/sayinbrahim/dotnet-context-mcp/releases)
+[![Release](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml)
 
-Bring deep .NET solution context to Claude Code via Roslyn-powered MCP tools.
+A solution-aware MCP server for .NET — six Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, and entity relationships. Published on npm.
 
-> **Status**: v0.1.0 published to npm. 4 tools working end-to-end. Looking for early adopters and feedback. PRs welcome.
+> **Status**: v0.1.2 published to npm. 6 tools live. Looking for early adopters and real-world feedback. PRs welcome.
 
 ## What it does
 
 When Claude Code works on .NET projects, it reads files one at a time and infers structure. For larger solutions, this is slow and lossy.
 
-This MCP server gives Claude **structured, Roslyn-backed access** to solution-level information. Questions like "what DbContexts exist", "show me entities in OrderContext", or "list migrations for ApplicationDbContext" become single tool calls instead of multi-file searches.
+This MCP server gives Claude **structured, Roslyn-backed access** to solution-level information. Questions like "what DbContexts exist", "what does this migration actually do", or "how are User and Order related" become single tool calls instead of multi-file searches.
 
 ## Architecture
 
 Two-layer bridge MCP design:
 
-- **TypeScript MCP layer** (~300 lines): Handles MCP protocol, spawns subprocess, returns structured responses
-- **.NET CLI layer** (~600 lines C#): Uses Roslyn Workspace API to load solutions and analyze code symbolically
+- **TypeScript MCP layer** (~270 lines): Handles MCP protocol, spawns subprocess, returns structured responses
+- **.NET CLI layer** (~2,000 lines C#): Uses the Roslyn Workspace API to load solutions and analyze code symbolically
 
 ```
 Claude Code (MCP client)
-        │  stdio
-        ▼
-TypeScript MCP server   ← src/index.ts (Node.js + @modelcontextprotocol/sdk)
-        │  child_process spawn + JSON on stdout
-        ▼
-.NET CLI bridge         ← cli/DotnetContextMcp.Cli/ (Roslyn workspace)
+       │  stdio
+       ▼
+TypeScript MCP Server (src/index.ts)
+       │  spawns
+       ▼
+.NET CLI (cli/DotnetContextMcp.Cli) — published binary or dotnet run
+       │  uses
+       ▼
+Roslyn (Microsoft.CodeAnalysis) — loads .sln, analyzes symbols/syntax
+       │  reads
+       ▼
+Your .NET solution (DbContexts, entities, migrations)
 ```
 
 ## Available tools
 
-### `echo`
-Test tool to verify MCP connection. Echoes input back to the caller.
-
-### `list_dbcontexts`
-Lists all EF Core DbContext classes in a solution.
-- **Input**: `solutionPath` (absolute .sln path)
-- **Output**: DbContext name, namespace, project, file path
-- Filters out abstract DbContexts automatically
-- Skips projects without EF Core reference
-
-### `list_entities`
-Lists EF Core entities (`DbSet<T>` properties) across all DbContexts.
-- **Input**: `solutionPath`, optional `dbContextName` filter
-- **Output**: Entity name, namespace, file path, owning DbSet property name
-
-### `list_migrations`
-Lists EF Core migrations organized by DbContext.
-- **Input**: `solutionPath`, optional `dbContextName` filter
-- **Output**: Migration ID, name, ISO 8601 timestamp, file path
-- Migrations sorted by timestamp ASC
-- Multi-DbContext subfolder layout supported (e.g., `Migrations/SecondDb/`)
-- Stats: earliest/latest migration date, total counts
+| Tool | Description |
+|------|-------------|
+| `echo` | Connectivity test |
+| `list_dbcontexts` | Discover all DbContext classes in the solution |
+| `list_entities` | List DbSet properties and entity metadata (optionally filtered by DbContext) |
+| `list_migrations` | Migration history with timestamps and owning context |
+| `analyze_migration` | Detailed Up/Down operations for a specific migration (13 operation types) |
+| `find_relationships` | Entity relationships: navigation properties, foreign keys, cardinality (OneToMany, ManyToOne, OneToOne, ManyToMany) |
 
 ## Platform support
 
@@ -120,26 +111,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup details.
 
 ## Usage examples
 
+After installation, just ask Claude Code in plain language:
+
 ### Discovering DbContexts
 
-> **You**: What DbContexts exist in my solution at C:\src\MyApp\MyApp.sln?
->
-> **Claude**: [calls list_dbcontexts] Found 2 DbContexts: ApplicationDbContext (MyApp.Data, 3 entities) and AuditDbContext (MyApp.Audit, 1 entity).
+> "List all DbContexts in this solution: C:\path\to\MySolution.sln"
 
-### Exploring entities
+Claude calls `list_dbcontexts` and returns each DbContext's name, namespace, project, and file path.
 
-> **You**: Show me the entities in ApplicationDbContext.
->
-> **Claude**: [calls list_entities with filter] ApplicationDbContext manages 3 entities: User, Order, Product. All in MyApp.Data.Entities namespace.
+### Analyzing a migration
 
-### Reviewing migrations
+> "Analyze the AddOrderRelations migration and tell me if it's safe to deploy"
 
-> **You**: What's the migration history for ApplicationDbContext?
->
-> **Claude**: [calls list_migrations] 5 migrations:
-> 1. 20240115_InitialCreate (2024-01-15)
-> 2. 20240201_AddOrderTotal (2024-02-01)
-> 3. ...
+Claude calls `analyze_migration`, inspects the Up/Down operations (CreateTable, AddForeignKey, AlterColumn, etc.), and gives you an informed answer — not just that a migration exists, but what it actually does.
+
+### Mapping entity relationships
+
+> "What's the relationship between User and Order in TestDbContext?"
+
+Claude calls `find_relationships` and returns the navigation graph: cardinality (OneToMany/ManyToOne), the foreign key column, and whether the relationship is required.
 
 ## Known limitations
 
@@ -150,21 +140,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup details.
 
 ## Roadmap
 
-### Done
-- [x] Phase 1–5: MCP scaffold, Roslyn integration, list_dbcontexts
-- [x] Phase 6: list_entities with optional filtering
-- [x] Phase 7: list_migrations with metadata extraction
-- [x] Phase 12.1–12.3: Self-contained binary publish (5-6x cold-start improvement, 4 platforms)
-- [x] Phase 13: Published as npm package (`npx dotnet-context-mcp`) — v0.1.0 live on npm
-
-### Next
-- [ ] Phase 8: analyze_migration (single migration detail with operations)
-- [ ] Phase 9: find_relationships (entity navigation properties)
+- [x] Phase 1-5: MCP scaffold + Roslyn (list_dbcontexts)
+- [x] Phase 6: list_entities
+- [x] Phase 7: list_migrations
+- [x] Phase 8: analyze_migration (v0.1.1)
+- [x] Phase 9: find_relationships (v0.1.2)
 - [ ] Phase 10: find_dbcontext_dependencies (DI graph)
-- [ ] Phase 11: analyze_solution_health (overall report)
-- [ ] Phase 12.4: Hermetic binary (no .NET SDK required on target)
-- [ ] Phase 14: Documentation site
-- [ ] Phase 15: VS Code extension installer
+- [ ] Phase 11: analyze_solution_health
+- [ ] Phase 12: analyzer plugins / custom rules
+- [ ] Phase 13: VS Code extension installer
 
 ## Contributing
 
