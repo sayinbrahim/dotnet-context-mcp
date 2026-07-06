@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.4 (2026-07-06)
+
+### Added
+- `find_dbcontext_dependencies` tool — analyzes DI registration of
+  DbContexts across the solution:
+  - Detects `AddDbContext`, `AddDbContextPool`, `AddDbContextFactory` calls
+  - Provider inference (SqlServer, Npgsql, Sqlite, InMemory, Oracle, MySQL, Cosmos)
+  - Connection string source (Configuration, Hardcoded, EnvironmentVariable)
+  - Lifetime (Scoped for pool, Singleton for factory)
+  - Location tracking (file + line number, solution-relative paths)
+- Total tools now: 7
+
 ## v0.1.3 (2026-07-04)
 
 ### Changed

@@ -266,6 +266,28 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "find_dbcontext_dependencies",
+  {
+    title: "Find DbContext DI Registrations",
+    description:
+      "Analyzes how DbContexts are registered in Dependency Injection across the solution. Returns registration method (AddDbContext, AddDbContextPool, AddDbContextFactory), provider (SqlServer, Npgsql, Sqlite, etc.), connection string source (Configuration, Hardcoded, EnvironmentVariable), lifetime, and location (file + line number). Use this to understand DbContext lifecycle and configuration across your app.",
+    inputSchema: z.object({
+      solutionPath: z.string().describe("Absolute path to the .sln file"),
+    }),
+  },
+  async ({ solutionPath }) => {
+    const absolutePath = resolvePath(solutionPath);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+    return callCli("find-dbcontext-dependencies", [absolutePath], "find_dbcontext_dependencies");
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 

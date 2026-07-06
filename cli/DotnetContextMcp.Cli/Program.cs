@@ -387,11 +387,66 @@ listRelationshipsCommand.SetHandler(async (string solutionPath, string dbContext
     }
 }, solutionArgForRelationships, dbContextArgForRelationships, entityOptionForRelationships);
 
+var findDbContextDependenciesCommand = new Command("find-dbcontext-dependencies", "Find DI registrations of EF Core DbContexts (AddDbContext, AddDbContextPool, AddDbContextFactory) in a solution");
+var solutionArgForDbContextDependencies = new Argument<string>("solution", "Path to .sln file");
+findDbContextDependenciesCommand.AddArgument(solutionArgForDbContextDependencies);
+findDbContextDependenciesCommand.SetHandler(async (string solutionPath) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var finder = new DbContextRegistrationFinder();
+            var (registrations, stats) = finder.Find(solution);
+
+            var output = new
+            {
+                solution = Path.GetFileName(solutionPath),
+                registrations,
+                stats = new
+                {
+                    totalRegistrations = stats.TotalRegistrations,
+                    byMethod = stats.ByMethod,
+                    byProvider = stats.ByProvider
+                }
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForDbContextDependencies);
+
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
 rootCommand.AddCommand(listEntitiesCommand);
 rootCommand.AddCommand(listMigrationsCommand);
 rootCommand.AddCommand(analyzeMigrationCommand);
 rootCommand.AddCommand(listRelationshipsCommand);
+rootCommand.AddCommand(findDbContextDependenciesCommand);
 
 return await rootCommand.InvokeAsync(args);
