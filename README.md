@@ -6,9 +6,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/sayinbrahim/dotnet-context-mcp)](https://github.com/sayinbrahim/dotnet-context-mcp/releases)
 [![Release](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml)
 
-A solution-aware MCP server for .NET — six Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, and entity relationships. Published on npm.
+A solution-aware MCP server for .NET — seven Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, and entity relationships. Published on npm.
 
-> **Status**: v0.1.2 published to npm. 6 tools live. Looking for early adopters and real-world feedback. PRs welcome.
+> **Status**: v0.1.4 published to npm. 7 tools live. Looking for early adopters and real-world feedback from teams running multi-context EF Core projects. Issues and PRs welcome.
 
 ## What it does
 
@@ -49,6 +49,7 @@ Your .NET solution (DbContexts, entities, migrations)
 | `list_migrations` | Migration history with timestamps and owning context |
 | `analyze_migration` | Detailed Up/Down operations for a specific migration (13 operation types) |
 | `find_relationships` | Entity relationships: navigation properties, foreign keys, cardinality (OneToMany, ManyToOne, OneToOne, ManyToMany) |
+| `find_dbcontext_dependencies` | Analyze DbContext dependency injection registrations across the solution: registration method (AddDbContext, AddDbContextPool, AddDbContextFactory), provider (SqlServer, Npgsql, Sqlite, etc.), connection string source, lifetime, and location (file + line). |
 
 ## Platform support
 
@@ -145,7 +146,7 @@ Claude calls `find_relationships` and returns the navigation graph: cardinality 
 - [x] Phase 7: list_migrations
 - [x] Phase 8: analyze_migration (v0.1.1)
 - [x] Phase 9: find_relationships (v0.1.2)
-- [ ] Phase 10: find_dbcontext_dependencies (DI graph)
+- [x] Phase 10: find_dbcontext_dependencies (v0.1.4)
 - [ ] Phase 11: analyze_solution_health
 - [ ] Phase 12: analyzer plugins / custom rules
 - [ ] Phase 13: VS Code extension installer
