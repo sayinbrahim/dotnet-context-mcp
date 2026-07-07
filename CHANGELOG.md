@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.5 (2026-07-08)
+
+### Added
+- `analyze_solution_health` tool — aggregate health report for .NET solutions:
+  - Composes 5 underlying analyzers (DbContext, Entity, Migration, Relationship, Registration)
+  - Detects 5 issue categories: multi-context-registration, hardcoded-connection-string, no-registration, no-migrations, many-manytomany
+  - Health score (0-100) with grade (A-F)
+  - Actionable recommendations grouped by category
+  - Per-DbContext breakdown
+- Total tools now: 8
+
+### Fixed
+- DbContext deduplication at the health analyzer layer — prevents
+  double-counting when a DbContext class library is referenced by
+  multiple projects (a common pattern in web + data library setups).
+  Note: individual `list_dbcontexts` still returns per-project entries
+  unchanged.
+
 ## v0.1.4 (2026-07-06)
 
 ### Added

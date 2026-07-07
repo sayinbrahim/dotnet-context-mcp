@@ -288,6 +288,28 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "analyze_solution_health",
+  {
+    title: "Analyze Solution Health",
+    description:
+      "Comprehensive EF Core health report for a .NET solution. Composes all other tools into an aggregate view: DbContext count, entity count, migration count, DI registrations, relationship graph. Detects common issues (multi-context registrations, hardcoded connection strings, unregistered DbContexts, missing migrations, many-to-many complexity). Returns health score (0-100), grade (A-F), actionable recommendations, and per-DbContext breakdown.",
+    inputSchema: z.object({
+      solutionPath: z.string().describe("Absolute path to the .sln file"),
+    }),
+  },
+  async ({ solutionPath }) => {
+    const absolutePath = resolvePath(solutionPath);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+    return callCli("analyze-solution-health", [absolutePath], "analyze_solution_health");
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 

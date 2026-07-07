@@ -441,6 +441,57 @@ findDbContextDependenciesCommand.SetHandler(async (string solutionPath) =>
     }
 }, solutionArgForDbContextDependencies);
 
+var analyzeSolutionHealthCommand = new Command("analyze-solution-health", "Aggregate DbContext/entity/migration/relationship/registration data into a solution health report");
+var solutionArgForHealth = new Argument<string>("solution", "Path to .sln file");
+analyzeSolutionHealthCommand.AddArgument(solutionArgForHealth);
+analyzeSolutionHealthCommand.SetHandler(async (string solutionPath) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var analyzer = new SolutionHealthAnalyzer();
+            var report = await analyzer.AnalyzeAsync(solution, solutionPath);
+
+            var output = new
+            {
+                solutionPath = Path.GetFileName(solutionPath),
+                summary = report.Summary,
+                issues = report.Issues,
+                recommendations = report.Recommendations,
+                byDbContext = report.ByDbContext
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForHealth);
+
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
 rootCommand.AddCommand(listEntitiesCommand);
@@ -448,5 +499,6 @@ rootCommand.AddCommand(listMigrationsCommand);
 rootCommand.AddCommand(analyzeMigrationCommand);
 rootCommand.AddCommand(listRelationshipsCommand);
 rootCommand.AddCommand(findDbContextDependenciesCommand);
+rootCommand.AddCommand(analyzeSolutionHealthCommand);
 
 return await rootCommand.InvokeAsync(args);
