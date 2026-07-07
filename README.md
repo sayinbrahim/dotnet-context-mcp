@@ -6,9 +6,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/sayinbrahim/dotnet-context-mcp)](https://github.com/sayinbrahim/dotnet-context-mcp/releases)
 [![Release](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml)
 
-A solution-aware MCP server for .NET — seven Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, and entity relationships. Published on npm.
+A solution-aware MCP server for .NET — eight Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, relationships, DI registrations, and aggregate health analysis. Published on npm.
 
-> **Status**: v0.1.4 published to npm. 7 tools live. Looking for early adopters and real-world feedback from teams running multi-context EF Core projects. Issues and PRs welcome.
+> **Status**: v0.1.5 published to npm. 8 tools live. Looking for early adopters and real-world feedback from teams running multi-context EF Core projects. Issues and PRs welcome.
 
 ## What it does
 
@@ -50,6 +50,7 @@ Your .NET solution (DbContexts, entities, migrations)
 | `analyze_migration` | Detailed Up/Down operations for a specific migration (13 operation types) |
 | `find_relationships` | Entity relationships: navigation properties, foreign keys, cardinality (OneToMany, ManyToOne, OneToOne, ManyToMany) |
 | `find_dbcontext_dependencies` | Analyze DbContext dependency injection registrations across the solution: registration method (AddDbContext, AddDbContextPool, AddDbContextFactory), provider (SqlServer, Npgsql, Sqlite, etc.), connection string source, lifetime, and location (file + line). |
+| `analyze_solution_health` | Comprehensive EF Core health report for the solution. Composes all other analyzers into an aggregate view: DbContext + entity + migration + registration + relationship counts. Detects 5 issue categories (multi-context registration, hardcoded connection strings, unregistered DbContexts, missing migrations, many-to-many complexity). Returns health score (0-100), grade (A-F), and actionable recommendations. |
 
 ## Platform support
 
@@ -147,7 +148,7 @@ Claude calls `find_relationships` and returns the navigation graph: cardinality 
 - [x] Phase 8: analyze_migration (v0.1.1)
 - [x] Phase 9: find_relationships (v0.1.2)
 - [x] Phase 10: find_dbcontext_dependencies (v0.1.4)
-- [ ] Phase 11: analyze_solution_health
+- [x] Phase 11: analyze_solution_health (v0.1.5)
 - [ ] Phase 12: analyzer plugins / custom rules
 - [ ] Phase 13: VS Code extension installer
 
