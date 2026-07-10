@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.2.0 (2026-07-10)
+
+### Added
+- **Custom analyzer plugin system** — users can now define their own
+  rules via JSON configuration files:
+  - Discovery from both convention folder (`.dotnet-context-mcp/plugins/*.json`)
+    and config file references (`dotnet-context-mcp.config.json`)
+  - Three rule types supported in this release:
+    - `name-regex` — enforces naming conventions on DbContexts or entities
+      via regular expressions
+    - `entity-count` — enforces complexity constraints on DbContext entity
+      counts (less-than, less-than-or-equal, greater-than, etc.)
+    - `operation-forbidden` — flags forbidden migration operation types
+      (e.g., DropTable) in Up methods
+  - Message templates with placeholders: `{name}`, `{count}`, `{migrationName}`,
+    `{tableName}`, `{operationType}`
+  - Rule validation at load time (invalid targets, invalid regex,
+    missing required fields all reported without silent drops)
+- New MCP tool: `run_custom_analyzers` — runs only custom rules, returns
+  issue list
+- Extended MCP tool: `analyze_solution_health` now accepts optional
+  `include_custom` flag — merges custom rule issues into unified health
+  report with recalculated score
+- Total tools now: 9
+
+### Notes
+- DLL-based plugins (Roslyn analyzer assemblies) deferred to a future
+  release — v0.2.0 focuses on JSON-based rules
+- Additional rule types (property-exists, attribute-present) also
+  deferred for feedback-driven prioritization
+
 ## v0.1.5 (2026-07-08)
 
 ### Added

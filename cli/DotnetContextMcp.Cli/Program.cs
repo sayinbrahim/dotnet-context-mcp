@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Build.Locator;
 using DotnetContextMcp.Cli.Analysis;
+using DotnetContextMcp.Cli.Plugins;
 
 MSBuildLocator.RegisterDefaults();
 
@@ -443,8 +444,10 @@ findDbContextDependenciesCommand.SetHandler(async (string solutionPath) =>
 
 var analyzeSolutionHealthCommand = new Command("analyze-solution-health", "Aggregate DbContext/entity/migration/relationship/registration data into a solution health report");
 var solutionArgForHealth = new Argument<string>("solution", "Path to .sln file");
+var includeCustomOption = new Option<bool>("--include-custom", "Include custom analyzer plugin results in the health report");
 analyzeSolutionHealthCommand.AddArgument(solutionArgForHealth);
-analyzeSolutionHealthCommand.SetHandler(async (string solutionPath) =>
+analyzeSolutionHealthCommand.AddOption(includeCustomOption);
+analyzeSolutionHealthCommand.SetHandler(async (string solutionPath, bool includeCustom) =>
 {
     solutionPath = Path.GetFullPath(solutionPath);
 
@@ -466,7 +469,7 @@ analyzeSolutionHealthCommand.SetHandler(async (string solutionPath) =>
         using (loader)
         {
             var analyzer = new SolutionHealthAnalyzer();
-            var report = await analyzer.AnalyzeAsync(solution, solutionPath);
+            var report = await analyzer.AnalyzeAsync(solution, solutionPath, includeCustom);
 
             var output = new
             {
@@ -490,7 +493,156 @@ analyzeSolutionHealthCommand.SetHandler(async (string solutionPath) =>
         }, jsonOptions));
         Environment.Exit(1);
     }
-}, solutionArgForHealth);
+}, solutionArgForHealth, includeCustomOption);
+
+var pluginListCommand = new Command("plugin-list", "Discover and load custom analyzer plugin JSON files for a solution");
+var solutionArgForPluginList = new Argument<string>("solution", "Path to .sln file");
+pluginListCommand.AddArgument(solutionArgForPluginList);
+pluginListCommand.SetHandler((string solutionPath) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+        var discovery = new PluginDiscovery();
+        var loader = new PluginLoader();
+        var files = discovery.FindPluginFiles(solutionDirectory);
+
+        var plugins = new List<object>();
+        var allErrors = new List<PluginLoadError>();
+        var totalRulesLoaded = 0;
+
+        foreach (var file in files)
+        {
+            var (manifest, fileErrors) = loader.LoadPluginFile(file);
+            allErrors.AddRange(fileErrors);
+
+            if (manifest != null)
+            {
+                totalRulesLoaded += manifest.Rules.Count;
+                plugins.Add(new
+                {
+                    name = manifest.Name,
+                    version = manifest.Version,
+                    filePath = Path.GetRelativePath(solutionDirectory, file).Replace('\\', '/'),
+                    ruleCount = manifest.Rules.Count,
+                    rules = manifest.Rules.Select(r => new
+                    {
+                        id = r.Id,
+                        target = r.Target,
+                        check = r.Check,
+                        severity = r.Severity
+                    }).ToList()
+                });
+            }
+        }
+
+        var errors = allErrors.Select(e => new
+        {
+            filePath = Path.GetRelativePath(solutionDirectory, e.FilePath).Replace('\\', '/'),
+            ruleId = e.RuleId,
+            errorMessage = e.ErrorMessage
+        }).ToList();
+
+        var output = new
+        {
+            solutionPath = Path.GetFileName(solutionPath),
+            totalPluginsLoaded = plugins.Count,
+            totalRulesLoaded,
+            plugins,
+            errors
+        };
+
+        Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForPluginList);
+
+var runCustomAnalyzersCommand = new Command("run-custom-analyzers", "Discover, load, and execute custom analyzer plugin rules against a solution");
+var solutionArgForCustomAnalyzers = new Argument<string>("solution", "Path to .sln file");
+runCustomAnalyzersCommand.AddArgument(solutionArgForCustomAnalyzers);
+runCustomAnalyzersCommand.SetHandler(async (string solutionPath) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+        var pluginLoader = new PluginLoader();
+        var loadResult = pluginLoader.LoadPlugins(solutionDirectory);
+
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var ruleEngine = new RuleEngine();
+            var execResult = await ruleEngine.ExecuteAsync(solution, solutionDirectory, loadResult.LoadedPlugins);
+
+            var output = new
+            {
+                solutionPath = Path.GetFileName(solutionPath),
+                pluginsLoaded = loadResult.LoadedPlugins.Count,
+                rulesEvaluated = execResult.RulesEvaluated,
+                issuesFound = execResult.IssuesFound,
+                issues = execResult.Issues.Select(i => new
+                {
+                    ruleId = i.RuleId,
+                    pluginName = i.PluginName,
+                    severity = i.Severity,
+                    category = i.Category,
+                    message = i.Message,
+                    affectedItems = i.AffectedItems
+                }).ToList(),
+                warnings = execResult.Warnings
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionArgForCustomAnalyzers);
 
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
@@ -500,5 +652,7 @@ rootCommand.AddCommand(analyzeMigrationCommand);
 rootCommand.AddCommand(listRelationshipsCommand);
 rootCommand.AddCommand(findDbContextDependenciesCommand);
 rootCommand.AddCommand(analyzeSolutionHealthCommand);
+rootCommand.AddCommand(pluginListCommand);
+rootCommand.AddCommand(runCustomAnalyzersCommand);
 
 return await rootCommand.InvokeAsync(args);

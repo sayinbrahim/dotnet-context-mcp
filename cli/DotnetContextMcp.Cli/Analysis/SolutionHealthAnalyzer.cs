@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using DotnetContextMcp.Cli.Plugins;
 
 namespace DotnetContextMcp.Cli.Analysis;
 
@@ -46,7 +47,7 @@ public class SolutionHealthAnalyzer
         _registrationFinder = new DbContextRegistrationFinder();
     }
 
-    public async Task<SolutionHealthReport> AnalyzeAsync(Solution solution, string solutionPath)
+    public async Task<SolutionHealthReport> AnalyzeAsync(Solution solution, string solutionPath, bool includeCustom = false)
     {
         var solutionDirectory = Path.GetDirectoryName(solutionPath) ?? string.Empty;
 
@@ -82,6 +83,48 @@ public class SolutionHealthAnalyzer
             issues.AddRange(DetectIssues(ctx, entities, migrations, relationships, ctxRegistrations));
         }
 
+        var recommendations = BuildRecommendations(issues);
+
+        if (includeCustom)
+        {
+            var pluginLoader = new PluginLoader();
+            var loadResult = pluginLoader.LoadPlugins(solutionDirectory);
+
+            if (loadResult.LoadedPlugins.Any())
+            {
+                var ruleEngine = new RuleEngine();
+                var execResult = await ruleEngine.ExecuteAsync(solution, solutionDirectory, loadResult.LoadedPlugins);
+
+                // Merge custom issues into main issue list
+                foreach (var customIssue in execResult.Issues)
+                {
+                    issues.Add(new HealthIssue(
+                        customIssue.Severity,
+                        customIssue.Category,
+                        customIssue.Message,
+                        customIssue.AffectedItems
+                    ));
+                }
+
+                // Add plugin errors as info-level issues (transparent about what failed)
+                foreach (var error in loadResult.Errors)
+                {
+                    issues.Add(new HealthIssue(
+                        "info",
+                        "plugin-load-error",
+                        $"Plugin load error in {Path.GetFileName(error.FilePath)}: {error.ErrorMessage}",
+                        new List<string> { error.FilePath }
+                    ));
+                }
+
+                // If custom issues added, add a summary recommendation
+                if (execResult.Issues.Any())
+                {
+                    recommendations.Add($"Review {execResult.Issues.Count} custom rule violation(s) from {loadResult.LoadedPlugins.Count} plugin(s).");
+                }
+            }
+        }
+
         var healthScore = ComputeHealthScore(issues);
 
         var summary = new HealthSummary(
@@ -93,8 +136,6 @@ public class SolutionHealthAnalyzer
             healthScore,
             ScoreToGrade(healthScore)
         );
-
-        var recommendations = BuildRecommendations(issues);
 
         return new SolutionHealthReport(
             solutionPath,

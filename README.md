@@ -6,9 +6,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/sayinbrahim/dotnet-context-mcp)](https://github.com/sayinbrahim/dotnet-context-mcp/releases)
 [![Release](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/sayinbrahim/dotnet-context-mcp/actions/workflows/release.yml)
 
-A solution-aware MCP server for .NET — eight Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, relationships, DI registrations, and aggregate health analysis. Published on npm.
+A solution-aware MCP server for .NET — nine Roslyn-powered tools that give Claude Code structured, symbol-level access to your DbContexts, entities, migrations, relationships, DI registrations, aggregate health analysis, and custom JSON-defined analyzer rules. Published on npm.
 
-> **Status**: v0.1.5 published to npm. 8 tools live. Looking for early adopters and real-world feedback from teams running multi-context EF Core projects. Issues and PRs welcome.
+> **Status**: v0.2.0 published to npm. 9 tools live. Looking for early adopters and real-world feedback from teams running multi-context EF Core projects. Issues and PRs welcome.
 
 ## What it does
 
@@ -51,6 +51,52 @@ Your .NET solution (DbContexts, entities, migrations)
 | `find_relationships` | Entity relationships: navigation properties, foreign keys, cardinality (OneToMany, ManyToOne, OneToOne, ManyToMany) |
 | `find_dbcontext_dependencies` | Analyze DbContext dependency injection registrations across the solution: registration method (AddDbContext, AddDbContextPool, AddDbContextFactory), provider (SqlServer, Npgsql, Sqlite, etc.), connection string source, lifetime, and location (file + line). |
 | `analyze_solution_health` | Comprehensive EF Core health report for the solution. Composes all other analyzers into an aggregate view: DbContext + entity + migration + registration + relationship counts. Detects 5 issue categories (multi-context registration, hardcoded connection strings, unregistered DbContexts, missing migrations, many-to-many complexity). Returns health score (0-100), grade (A-F), and actionable recommendations. |
+| `run_custom_analyzers` | Discovers and runs custom JSON-defined analyzer rules from `.dotnet-context-mcp/plugins/*.json` or referenced from `dotnet-context-mcp.config.json`. Supports 3 rule types: name-regex, entity-count, operation-forbidden. Returns issues with severity, message, and affected items. |
+
+## Custom Analyzer Plugins (v0.2.0)
+
+You can define your own rules with JSON. Drop plugin files into
+`{solution-root}/.dotnet-context-mcp/plugins/*.json` and they'll be
+auto-discovered by `run_custom_analyzers` and (optionally)
+`analyze_solution_health`.
+
+Example plugin:
+
+```json
+{
+  "name": "Team Naming Conventions",
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "TEAM001",
+      "target": "dbcontext",
+      "check": "name-regex",
+      "pattern": "^[A-Z][a-zA-Z]*DbContext$",
+      "severity": "warning",
+      "message": "DbContext '{name}' must be PascalCase ending in 'DbContext'"
+    },
+    {
+      "id": "TEAM002",
+      "target": "dbcontext",
+      "check": "entity-count",
+      "operator": "less-than-or-equal",
+      "value": 30,
+      "severity": "info",
+      "message": "DbContext '{name}' has {count} entities. Consider splitting at 30+."
+    },
+    {
+      "id": "TEAM003",
+      "target": "migration-operation",
+      "check": "operation-forbidden",
+      "operationType": "DropTable",
+      "severity": "error",
+      "message": "DropTable in '{migrationName}' requires DBA approval"
+    }
+  ]
+}
+```
+
+See full plugin documentation in the [docs site (coming soon)]().
 
 ## Platform support
 
@@ -149,7 +195,7 @@ Claude calls `find_relationships` and returns the navigation graph: cardinality 
 - [x] Phase 9: find_relationships (v0.1.2)
 - [x] Phase 10: find_dbcontext_dependencies (v0.1.4)
 - [x] Phase 11: analyze_solution_health (v0.1.5)
-- [ ] Phase 12: analyzer plugins / custom rules
+- [x] Phase 12: custom analyzer plugin system (v0.2.0)
 - [ ] Phase 13: VS Code extension installer
 
 ## Contributing

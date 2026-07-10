@@ -293,7 +293,39 @@ server.registerTool(
   {
     title: "Analyze Solution Health",
     description:
-      "Comprehensive EF Core health report for a .NET solution. Composes all other tools into an aggregate view: DbContext count, entity count, migration count, DI registrations, relationship graph. Detects common issues (multi-context registrations, hardcoded connection strings, unregistered DbContexts, missing migrations, many-to-many complexity). Returns health score (0-100), grade (A-F), actionable recommendations, and per-DbContext breakdown.",
+      "Comprehensive EF Core health report for a .NET solution. Composes all other tools into an aggregate view: DbContext count, entity count, migration count, DI registrations, relationship graph. Detects common issues (multi-context registrations, hardcoded connection strings, unregistered DbContexts, missing migrations, many-to-many complexity). Returns health score (0-100), grade (A-F), actionable recommendations, and per-DbContext breakdown. Optionally includes results from custom analyzer plugins when include_custom is true.",
+    inputSchema: z.object({
+      solutionPath: z.string().describe("Absolute path to the .sln file"),
+      include_custom: z
+        .boolean()
+        .optional()
+        .describe("Include custom analyzer plugin results in the health report (default: false)"),
+    }),
+  },
+  async ({ solutionPath, include_custom }) => {
+    const absolutePath = resolvePath(solutionPath);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+
+    const args = [absolutePath];
+    if (include_custom) {
+      args.push("--include-custom");
+    }
+
+    return callCli("analyze-solution-health", args, "analyze_solution_health");
+  }
+);
+
+server.registerTool(
+  "run_custom_analyzers",
+  {
+    title: "Run Custom Analyzer Plugins",
+    description:
+      "Discovers and executes JSON-defined custom analyzer rules from the solution. Plugins can be placed in {solution-root}/.dotnet-context-mcp/plugins/*.json or referenced from {solution-root}/dotnet-context-mcp.config.json. Supports 3 rule types: name-regex (naming conventions), entity-count (complexity constraints), and operation-forbidden (migration safety). Returns discovered rule issues with severity, message, and affected items.",
     inputSchema: z.object({
       solutionPath: z.string().describe("Absolute path to the .sln file"),
     }),
@@ -306,7 +338,7 @@ server.registerTool(
         isError: true,
       };
     }
-    return callCli("analyze-solution-health", [absolutePath], "analyze_solution_health");
+    return callCli("run-custom-analyzers", [absolutePath], "run_custom_analyzers");
   }
 );
 
