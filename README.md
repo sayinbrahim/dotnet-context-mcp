@@ -130,6 +130,15 @@ claude mcp list
 
 The first tool call may take 5-15 seconds (npm fetches the package and downloads the platform-specific binary). Subsequent calls are 3-4 seconds.
 
+### Zero-Config Setup (Recommended)
+
+Instead of manually adding dotnet-context-mcp to your MCP client's config, use one of:
+
+1. **VS Code / Cursor extension** — [dotnet-context-mcp on Open VSX](https://open-vsx.org/extension/sayinbrahim/dotnet-context-mcp) (auto-detects clients, adds config, provides sidebar tree view)
+2. **CLI command** — `npx dotnet-context-mcp@latest init-client` (interactive setup, supports all MCP clients)
+
+Both take under a minute.
+
 ### Platform support
 
 Pre-built binaries are automatically downloaded for:
@@ -179,6 +188,40 @@ Claude calls `analyze_migration`, inspects the Up/Down operations (CreateTable, 
 
 Claude calls `find_relationships` and returns the navigation graph: cardinality (OneToMany/ManyToOne), the foreign key column, and whether the relationship is required.
 
+## Zero-Config Setup for MCP Clients (v0.2.1+)
+
+Instead of manually adding dotnet-context-mcp to your MCP client config, run:
+
+```bash
+npx dotnet-context-mcp@latest init-client
+```
+
+This auto-detects Claude Code, Cursor, Continue.dev, and Windsurf on your system and adds dotnet-context-mcp to their MCP server config with confirmation.
+
+Options:
+
+```bash
+# Interactive (default) — detect all, prompt to select
+npx dotnet-context-mcp@latest init-client
+
+# Direct — install to specific client(s)
+npx dotnet-context-mcp@latest init-client --client claude-code
+
+# Multiple clients at once
+npx dotnet-context-mcp@latest init-client --client claude-code --client cursor
+
+# Verify current setup
+npx dotnet-context-mcp@latest init-client --verify
+
+# Uninstall
+npx dotnet-context-mcp@latest init-client --remove --client claude-code
+
+# Skip confirmations
+npx dotnet-context-mcp@latest init-client --yes
+```
+
+**VS Code, Cursor, and other MCP-compatible editors:** install the [dotnet-context-mcp extension](https://open-vsx.org/extension/sayinbrahim/dotnet-context-mcp) from Open VSX for GUI setup with a solution tree view, status bar, and reactive settings. VS Code Marketplace listing coming soon.
+
 ## Known limitations
 
 - **Cold start**: First call takes 3–4 seconds (self-contained binary warm-up). Previously 15–20s with `dotnet run`.
@@ -196,7 +239,7 @@ Claude calls `find_relationships` and returns the navigation graph: cardinality 
 - [x] Phase 10: find_dbcontext_dependencies (v0.1.4)
 - [x] Phase 11: analyze_solution_health (v0.1.5)
 - [x] Phase 12: custom analyzer plugin system (v0.2.0)
-- [ ] Phase 13: VS Code extension installer
+- [x] Phase 13: VS Code extension installer (v0.1.0 on Open VSX, VS Code Marketplace pending)
 
 ## Contributing
 
