@@ -6,9 +6,62 @@ import { resolve as resolvePath } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { runInitClient, InitClientOptions } from "./cli/initClient.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const cliArgs = process.argv.slice(2);
+if (cliArgs[0] === "init-client") {
+  const options: InitClientOptions = {
+    client: [],
+    remove: cliArgs.includes("--remove"),
+    verify: cliArgs.includes("--verify"),
+    yes: cliArgs.includes("--yes") || cliArgs.includes("-y"),
+  };
+
+  for (let i = 1; i < cliArgs.length; i++) {
+    if (cliArgs[i] === "--client" && cliArgs[i + 1]) {
+      options.client!.push(cliArgs[i + 1]);
+      i++;
+    }
+  }
+
+  const exitCode = await runInitClient(options);
+  process.exit(exitCode);
+}
+
+// Subcommands implemented by the bundled .NET CLI. Passing one of these as the
+// first argument runs the CLI directly and forwards its JSON stdout, instead of
+// starting the MCP stdio server — this lets tools like the VS Code extension's
+// sidebar tree view call `npx dotnet-context-mcp@latest <subcommand> ...` and get
+// a JSON result back on a normal process exit.
+const CLI_PASSTHROUGH_SUBCOMMANDS = new Set([
+  "list-dbcontexts",
+  "list-entities",
+  "list-migrations",
+  "analyze-migration",
+  "list-relationships",
+  "find-dbcontext-dependencies",
+  "analyze-solution-health",
+  "run-custom-analyzers",
+]);
+
+if (CLI_PASSTHROUGH_SUBCOMMANDS.has(cliArgs[0])) {
+  const projectRoot = resolvePath(__dirname, "..");
+  const { command, baseArgs, cwd } = resolveCliCommand(projectRoot);
+  const proc = spawn(command, [...baseArgs, ...cliArgs], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+  proc.stdout.pipe(process.stdout);
+  proc.stderr.pipe(process.stderr);
+  const exitCode = await new Promise<number>((resolveExit) => {
+    proc.on("close", (code) => resolveExit(code ?? 1));
+    proc.on("error", (err) => {
+      console.error(`[dotnet-context-mcp] Failed to spawn CLI: ${err.message}`);
+      resolveExit(1);
+    });
+  });
+  process.exit(exitCode);
+}
 
 function resolveCliCommand(projectRoot: string): { command: string; baseArgs: string[]; cwd: string } {
   const platform = process.platform;

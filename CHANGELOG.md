@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.2.1 (2026-07-17)
+
+### Added
+- **CLI command: `init-client`** — zero-config MCP client setup from the terminal:
+  - Auto-detects installed MCP clients (Claude Code, Cursor, Continue.dev, Windsurf)
+  - Adds dotnet-context-mcp to their config with automatic backup
+  - Interactive multi-client selection or --client flag for direct install
+  - --remove, --verify, --yes flags for uninstall, status check, and CI usage
+- Companion to the [VS Code / Cursor extension](https://open-vsx.org/extension/sayinbrahim/dotnet-context-mcp)
+  now live on Open VSX
+
+### Fixed
+- CLI dispatch for `analyze-solution-health` and related commands now returns
+  JSON to stdout instead of starting the MCP server (allows extension and
+  scripts to consume output)
+- Windows `spawn('npx', ...)` compatibility — uses shell: true on win32 to
+  correctly resolve npx.cmd
+
+### Docs
+- Consolidated "Zero-Config Setup" section under Installation
+- Added Open VSX extension link
+- Marked Phase 13 as complete in roadmap
+
 ## v0.2.0 (2026-07-10)
 
 ### Added
