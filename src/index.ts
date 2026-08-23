@@ -45,6 +45,8 @@ const CLI_PASSTHROUGH_SUBCOMMANDS = new Set([
   "find-dbcontext-dependencies",
   "analyze-solution-health",
   "run-custom-analyzers",
+  "analyze-migration-safety",
+  "get-solution-safety-report",
 ]);
 
 if (CLI_PASSTHROUGH_SUBCOMMANDS.has(cliArgs[0])) {
@@ -392,6 +394,58 @@ server.registerTool(
       };
     }
     return callCli("run-custom-analyzers", [absolutePath], "run_custom_analyzers");
+  }
+);
+
+server.registerTool(
+  "analyze_migration_safety",
+  {
+    title: "Analyze Migration Safety",
+    description:
+      "Runs 9 EF Core migration safety analyzers (EFMS001-EFMS009) against a single migration file. Returns issues with severity (error/warning/info), line numbers, recommended fixes, and EFMS codes. Use before running `dotnet ef database update` to catch data-loss and consistency problems that generic AI code review misses. Line numbers only, no column positions.",
+    inputSchema: z.object({
+      migrationFile: z.string().describe("Absolute path to the Migration .cs file"),
+      includeWarnings: z.boolean().default(true).describe("Include Warning-severity issues (default: true)"),
+      includeInfo: z.boolean().default(false).describe("Include Info-severity issues (default: false)"),
+    }),
+  },
+  async ({ migrationFile, includeWarnings, includeInfo }) => {
+    const absolutePath = resolvePath(migrationFile);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Migration file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+    return await callCli("analyze-migration-safety", [
+      "--migration-file", absolutePath,
+      ...(includeWarnings === false ? ["--include-warnings", "false"] : []),
+      ...(includeInfo === true ? ["--include-info", "true"] : []),
+    ], "analyze_migration_safety");
+  }
+);
+
+server.registerTool(
+  "get_solution_safety_report",
+  {
+    title: "Get Solution Safety Report",
+    description:
+      "Runs all 9 EF Core migration safety analyzers across every migration in a .NET solution. Returns an aggregate report with safety score (0-100), grade (A-F), and top issues per DbContext. Use for pre-deployment audits, onboarding to a new codebase, or benchmarking migration health over time.",
+    inputSchema: z.object({
+      solutionPath: z.string().describe("Absolute path to the .sln file"),
+    }),
+  },
+  async ({ solutionPath }) => {
+    const absolutePath = resolvePath(solutionPath);
+    if (!existsSync(absolutePath)) {
+      return {
+        content: [{ type: "text", text: `Error: Solution file not found at ${absolutePath}` }],
+        isError: true,
+      };
+    }
+    return await callCli("get-solution-safety-report", [
+      "--solution-path", absolutePath,
+    ], "get_solution_safety_report");
   }
 );
 

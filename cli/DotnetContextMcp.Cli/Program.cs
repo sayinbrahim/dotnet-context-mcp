@@ -644,6 +644,127 @@ runCustomAnalyzersCommand.SetHandler(async (string solutionPath) =>
     }
 }, solutionArgForCustomAnalyzers);
 
+var analyzeMigrationSafetyCommand = new Command("analyze-migration-safety", "Run EF Core migration safety analyzers (EFMS001-009) against a single migration file");
+var migrationFileOption = new Option<string>("--migration-file", "Path to the migration .cs file to analyze") { IsRequired = true };
+var includeWarningsOption = new Option<bool>("--include-warnings", () => true, "Include warning-severity issues in the output");
+var includeInfoOption = new Option<bool>("--include-info", () => false, "Include info-severity issues in the output");
+analyzeMigrationSafetyCommand.AddOption(migrationFileOption);
+analyzeMigrationSafetyCommand.AddOption(includeWarningsOption);
+analyzeMigrationSafetyCommand.AddOption(includeInfoOption);
+analyzeMigrationSafetyCommand.SetHandler(async (string migrationFile, bool includeWarnings, bool includeInfo) =>
+{
+    migrationFile = Path.GetFullPath(migrationFile);
+
+    if (!File.Exists(migrationFile))
+    {
+        Console.Error.WriteLine($"[error] Migration file not found: {migrationFile}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Migration file not found",
+            details = migrationFile
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var sourceText = await File.ReadAllTextAsync(migrationFile);
+        var issues = MigrationSafetyAnalyzer.Analyze(sourceText, migrationFile, includeWarnings, includeInfo);
+        var summary = MigrationSafetyAnalyzer.Summarize(issues);
+
+        var output = new
+        {
+            migrationFile,
+            issues = issues.Select(i => new
+            {
+                code = i.Code,
+                analyzerName = i.AnalyzerName,
+                severity = i.Severity,
+                message = i.Message,
+                recommendation = i.Recommendation,
+                filePath = i.FilePath,
+                line = i.Line
+            }).ToList(),
+            summary = new
+            {
+                errorCount = summary.ErrorCount,
+                warningCount = summary.WarningCount,
+                infoCount = summary.InfoCount
+            }
+        };
+
+        Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, migrationFileOption, includeWarningsOption, includeInfoOption);
+
+var getSolutionSafetyReportCommand = new Command("get-solution-safety-report", "Aggregate EF Core migration safety analysis (EFMS001-009) across every migration in a solution");
+var solutionPathOptionForSafety = new Option<string>("--solution-path", "Path to .sln file") { IsRequired = true };
+getSolutionSafetyReportCommand.AddOption(solutionPathOptionForSafety);
+getSolutionSafetyReportCommand.SetHandler(async (string solutionPath) =>
+{
+    solutionPath = Path.GetFullPath(solutionPath);
+
+    if (!File.Exists(solutionPath))
+    {
+        Console.Error.WriteLine($"[error] Solution file not found: {solutionPath}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = "Solution file not found",
+            details = solutionPath
+        }, jsonOptions));
+        Environment.Exit(1);
+        return;
+    }
+
+    try
+    {
+        var (loader, solution) = await SolutionLoader.LoadAsync(solutionPath);
+        using (loader)
+        {
+            var report = await SolutionSafetyReportAnalyzer.AnalyzeAsync(solution, solutionPath);
+
+            var output = new
+            {
+                solutionPath = report.SolutionPath,
+                totalMigrations = report.TotalMigrations,
+                totalIssues = report.TotalIssues,
+                byDbContext = report.ByDbContext.Select(d => new
+                {
+                    dbContextName = d.DbContextName,
+                    migrationCount = d.MigrationCount,
+                    issueCount = d.IssueCount,
+                    topIssues = d.TopIssues.Select(t => new { code = t.Code, count = t.Count }).ToList()
+                }).ToList(),
+                safetyScore = report.SafetyScore,
+                grade = report.Grade
+            };
+
+            Console.WriteLine(JsonSerializer.Serialize(output, jsonOptions));
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[error] {ex}");
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            error = ex.Message,
+            details = ex.ToString()
+        }, jsonOptions));
+        Environment.Exit(1);
+    }
+}, solutionPathOptionForSafety);
+
 var rootCommand = new RootCommand("dotnet-context-mcp CLI - Roslyn-based .NET solution analysis");
 rootCommand.AddCommand(listDbContextsCommand);
 rootCommand.AddCommand(listEntitiesCommand);
@@ -654,5 +775,7 @@ rootCommand.AddCommand(findDbContextDependenciesCommand);
 rootCommand.AddCommand(analyzeSolutionHealthCommand);
 rootCommand.AddCommand(pluginListCommand);
 rootCommand.AddCommand(runCustomAnalyzersCommand);
+rootCommand.AddCommand(analyzeMigrationSafetyCommand);
+rootCommand.AddCommand(getSolutionSafetyReportCommand);
 
 return await rootCommand.InvokeAsync(args);

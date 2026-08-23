@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.0 (2026-08-24)
+
+### Added
+- **New MCP tool: `analyze_migration_safety`** — runs 9 EF Core migration safety analyzers against a single migration file. Returns EFMS-coded issues (EFMS001-EFMS009) with severity, line numbers, messages, and recommendations. Line numbers only, no column positions.
+- **New MCP tool: `get_solution_safety_report`** — aggregates safety analysis across every migration in a .NET solution. Returns safety score (0-100), grade (A-F), and top issues grouped by DbContext.
+
+### Changed
+- CLI now depends on `EfMigrationSafety.Analyzers` v0.2.0 (via NuGet PackageReference). No code duplication; both packages evolve together.
+
+### Notes
+- Total MCP tools: 11 (was 9).
+- EFMS code mapping is defined in-CLI for now (`MigrationSafetyAnalyzer.cs`); a future ef-migration-safety release may expose these codes directly on the SafetyIssue record.
+
 ## v0.2.1 (2026-07-17)
 
 ### Added
