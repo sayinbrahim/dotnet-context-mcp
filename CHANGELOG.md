@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.4.0-alpha.2 (2026-08-25)
+
+**⚠️ Alpha release**: HTTP transport is experimental and single-client only. Not for production. Install via `npm install dotnet-context-mcp@alpha`.
+
+### Fixed
+- **Broken package install carried over from 0.4.0-alpha.1** — `package.json`'s `files` array only shipped `build/index.js`, but `src/index.ts` statically imports `./cli/initClient.js`, `./clientConfig/*`, and (new in this release) `./transports/http-transport.js` as separate compiled files `tsc` emits alongside it. Every published install crashed immediately on any invocation — stdio, HTTP, `init-client`, everything — with `ERR_MODULE_NOT_FOUND`. Same root cause as the [v0.3.1](#v031-2026-08-25) emergency patch to `latest`; alpha.1 was never usable. `files` now explicitly lists the compiled TS output (`build/cli/initClient.js(.map)`, `build/clientConfig/`, `build/transports/`), keeping the downloaded per-platform .NET CLI binaries under `build/cli/` out of the tarball. Verified by installing the packed tarball globally and confirming stdio `tools/list`, HTTP `tools/list`, and `tools/call` all return correctly.
+
+### Notes
+- No functional changes to the HTTP transport itself beyond this release — see the [v0.4.0-alpha.1](#v040-alpha1-2026-08-24) entry below for what HTTP transport adds.
+
 ## v0.4.0-alpha.1 (2026-08-24)
 
 **⚠️ Alpha release**: HTTP transport is experimental and single-client only. Not for production. Install via `npm install dotnet-context-mcp@alpha`.

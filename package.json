@@ -1,6 +1,6 @@
 {
   "name": "dotnet-context-mcp",
-  "version": "0.4.0-alpha.1",
+  "version": "0.4.0-alpha.2",
   "description": "MCP server bringing Roslyn-powered .NET solution context to Claude Code",
   "keywords": [
     "mcp",
