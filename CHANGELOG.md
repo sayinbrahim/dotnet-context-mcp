@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.4.0 (unreleased)
+## v0.4.0-alpha.1 (2026-08-24)
+
+**⚠️ Alpha release**: HTTP transport is experimental and single-client only. Not for production. Install via `npm install dotnet-context-mcp@alpha`.
 
 ### Added
 - **HTTP transport (experimental)** — the MCP server can now run as an HTTP endpoint via `--transport http --port <n>`. Implements MCP 2026-07-28 spec's stateless request/response model (`src/transports/http-transport.ts`, built on the SDK's `WebStandardStreamableHTTPServerTransport`). Prep work for hosted deployment. No auth yet; localhost use only.
