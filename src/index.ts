@@ -3,10 +3,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { spawn } from "node:child_process";
 import { resolve as resolvePath } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { runInitClient, InitClientOptions } from "./cli/initClient.js";
+import { startHttpTransport } from "./transports/http-transport.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -152,9 +153,13 @@ async function callCli(
   }
 }
 
+const packageJson = JSON.parse(
+  readFileSync(resolvePath(__dirname, "../package.json"), "utf-8")
+) as { version: string };
+
 const server = new McpServer({
   name: "dotnet-context-mcp",
-  version: "0.1.0",
+  version: packageJson.version,
 });
 
 server.registerTool(
@@ -449,7 +454,31 @@ server.registerTool(
   }
 );
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+function parseTransportArg(): "stdio" | "http" {
+  const flagIndex = cliArgs.indexOf("--transport");
+  const value = flagIndex !== -1 ? cliArgs[flagIndex + 1] : undefined;
+  if (value === "http") return "http";
+  if (value === undefined || value === "stdio") return "stdio";
+  throw new Error(`Unknown --transport value: ${value}. Expected "stdio" or "http".`);
+}
 
-console.error("dotnet-context-mcp server running on stdio");
+function parsePortArg(): number {
+  const flagIndex = cliArgs.indexOf("--port");
+  const value = flagIndex !== -1 ? cliArgs[flagIndex + 1] : undefined;
+  if (value === undefined) return 3000;
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new Error(`Invalid --port value: ${value}`);
+  }
+  return port;
+}
+
+const transportMode = parseTransportArg();
+
+if (transportMode === "http") {
+  await startHttpTransport(server, parsePortArg());
+} else {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("dotnet-context-mcp server running on stdio");
+}
