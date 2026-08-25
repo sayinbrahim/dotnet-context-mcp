@@ -30,6 +30,10 @@
     "bin/",
     "build/index.js",
     "build/index.js.map",
+    "build/cli/initClient.js",
+    "build/cli/initClient.js.map",
+    "build/clientConfig/",
+    "build/transports/",
     "scripts/download-binary.js",
     "README.md",
     "LICENSE"
