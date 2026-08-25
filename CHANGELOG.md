@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.1 (2026-08-25)
+
+**🚨 Emergency patch**: v0.3.0 (and every version back through v0.2.1) crashed on startup for every fresh install — `npx dotnet-context-mcp@latest`, global install, all of it. Fixed below; upgrade immediately.
+
+### Fixed
+- `package.json`'s `files` array only shipped `build/index.js`, but `src/index.ts` statically imports `./cli/initClient.js` (added in v0.2.1's `init-client` command) as separate compiled output that `tsc` emits alongside it. Every published install was missing that file (and the `build/clientConfig/` modules it depends on), so every invocation — stdio server start, `init-client`, all CLI passthrough subcommands — failed immediately with `ERR_MODULE_NOT_FOUND`. The `files` array now explicitly lists `build/cli/initClient.js(.map)` and `build/clientConfig/`, verified by installing the packed tarball globally and confirming both `tools/list` over stdio and `init-client` work.
+- Note: `build/cli/` also holds the downloaded per-platform .NET CLI binaries (`win-x64`, `linux-x64`, `osx-x64`, `osx-arm64`) alongside `initClient.js` — those are intentionally *not* added to `files` (they're fetched separately via the `postinstall` script from GitHub Releases), which is why this fix lists the compiled TS files explicitly rather than the whole `build/cli/` directory.
+
 ## v0.3.0 (2026-08-24)
 
 ### Added
