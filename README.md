@@ -188,6 +188,44 @@ Claude calls `analyze_migration`, inspects the Up/Down operations (CreateTable, 
 
 Claude calls `find_relationships` and returns the navigation graph: cardinality (OneToMany/ManyToOne), the foreign key column, and whether the relationship is required.
 
+## Transports
+
+The server supports two transports, selected by CLI flag when launching `build/index.js`. Tool registration is shared — both transports run the same 11 tools, only the connection layer differs.
+
+### Stdio (default)
+
+```bash
+node build/index.js
+# or explicitly:
+node build/index.js --transport stdio
+```
+
+This is the existing, unchanged behavior: the server is spawned as a subprocess and speaks MCP over stdin/stdout. This is what `claude mcp add` and the CLI passthrough subcommands use, and it's the only transport in stable use today.
+
+### HTTP (experimental)
+
+```bash
+node build/index.js --transport http --port 3000
+```
+
+Implements the MCP 2026-07-28 spec's stateless Streamable HTTP transport, exposing a single `POST /mcp` JSON-RPC endpoint. **This is prep work for a future hosted deployment (Cloudflare Workers / Azure Container Apps) — it is not yet meant for production use.** No auth, localhost only.
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": { "name": "echo", "arguments": { "message": "hello http" } }
+  }'
+```
+
+**Architecture**: the transport is stateless — no session ID is issued or tracked. Because the SDK forbids reusing a stateless transport instance across requests, a fresh `WebStandardStreamableHTTPServerTransport` is created and connected to the shared `McpServer` instance for each incoming request, then disconnected once the response is written. Tool definitions live in exactly one place (`src/index.ts`); only the per-request transport object is throwaway.
+
+**Known limitation**: because the same `McpServer` instance is (re)connected per request, two requests arriving concurrently can race — the second may see `"Already connected to a transport"` if it arrives before the first request's transport has disconnected. This is safe for local, single-client development and testing but is not safe for concurrent production traffic. A hosted deployment will need a transport/session pool (one `McpServer`+transport pair per in-flight request, or an equivalent) before this can serve real concurrent load — tracked as follow-up work, not solved here.
+
 ## Known limitations
 
 - **Cold start**: First call takes 3–4 seconds (self-contained binary warm-up). Previously 15–20s with `dotnet run`.

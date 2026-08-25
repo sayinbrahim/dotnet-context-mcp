@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0 (unreleased)
+
+### Added
+- **HTTP transport (experimental)** — the MCP server can now run as an HTTP endpoint via `--transport http --port <n>`. Implements MCP 2026-07-28 spec's stateless request/response model (`src/transports/http-transport.ts`, built on the SDK's `WebStandardStreamableHTTPServerTransport`). Prep work for hosted deployment. No auth yet; localhost use only.
+
+### Fixed
+- `serverInfo.version` reported in the MCP `initialize` response was hardcoded to `"0.1.0"` and had drifted from the actual package version since v0.1.0. Now read dynamically from `package.json` at startup, so it can't drift again.
+
+### Notes
+- Stdio transport remains the default and is unchanged.
+- Both transports share the same 11 tool implementations — no duplication.
+- HTTP transport is stateless: a fresh transport is connected per request and closed after the response is written, since the SDK forbids reusing a stateless transport instance across requests. Known limitation: concurrent requests can race on the shared `McpServer` connection (`"Already connected to a transport"`); safe for local dev, not yet for concurrent production load. A transport pool is planned before real hosted deployment.
+
 ## v0.3.0 (2026-08-24)
 
 ### Added
