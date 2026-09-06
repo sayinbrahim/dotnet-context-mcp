@@ -32,6 +32,8 @@ Usage:
 Options:
   --transport <stdio|http>  Transport to use (default: stdio)
   --port <number>           Port for HTTP transport (default: 3000)
+  --api-key <key>           Require X-API-Key header on HTTP requests (default: no auth)
+                            Also settable via DOTNET_CONTEXT_API_KEY env var; --api-key wins.
   --version, -v             Print the version and exit
   --help, -h                Print this help message and exit
 
@@ -511,10 +513,17 @@ function parsePortArg(): number {
   return port;
 }
 
+function parseApiKeyArg(): string | undefined {
+  const flagIndex = cliArgs.indexOf("--api-key");
+  const value = flagIndex !== -1 ? cliArgs[flagIndex + 1] : undefined;
+  if (value) return value;
+  return process.env.DOTNET_CONTEXT_API_KEY || undefined;
+}
+
 const transportMode = parseTransportArg();
 
 if (transportMode === "http") {
-  await startHttpTransport(server, parsePortArg());
+  await startHttpTransport(server, parsePortArg(), parseApiKeyArg());
 } else {
   const transport = new StdioServerTransport();
   await server.connect(transport);

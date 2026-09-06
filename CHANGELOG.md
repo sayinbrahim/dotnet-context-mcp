@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.0-alpha.4 (2026-09-06)
+
+### Added
+- **API key authentication for HTTP transport**. Enable via --api-key CLI flag or DOTNET_CONTEXT_API_KEY environment variable. When enabled, requests must include X-API-Key header. Backward compatible: no auth required when neither is set.
+- Startup warning when HTTP transport runs without authentication.
+
+### Infrastructure (from previous commit, unreleased until now)
+- Docker support (Dockerfile + .dockerignore) for HTTP transport deployment. Multi-stage build using node:22-slim, ~595MB image. Includes libicu72 and ca-certificates for .NET binary compatibility (Alpine incompatible, glibc required).
+
+### Notes
+Prep for September private beta. OAuth 2.1 will land in v0.5.0.
+
 ## v0.4.0-alpha.3 (2026-08-25)
 
 ### Fixed

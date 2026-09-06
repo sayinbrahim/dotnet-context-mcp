@@ -60,7 +60,11 @@ async function writeWebResponse(webResponse: Response, res: ServerResponse): Pro
  * with no trace anywhere. Talking to the Web-standard transport directly also matches
  * what a future Cloudflare Workers deployment would use.
  */
-export async function startHttpTransport(server: McpServer, port: number): Promise<void> {
+export async function startHttpTransport(server: McpServer, port: number, apiKey?: string): Promise<void> {
+  if (!apiKey) {
+    console.error("WARNING: HTTP transport running without authentication. Do not expose to public network.");
+  }
+
   const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     if (req.url !== "/mcp") {
       res.writeHead(404, { "Content-Type": "application/json" }).end(
@@ -72,6 +76,18 @@ export async function startHttpTransport(server: McpServer, port: number): Promi
     if (req.method !== "POST") {
       res.writeHead(405, { "Content-Type": "application/json" }).end(
         JSON.stringify({ error: "Method not allowed. Use POST." })
+      );
+      return;
+    }
+
+    if (apiKey && req.headers["x-api-key"] !== apiKey) {
+      console.error("[http-transport] auth failed for request");
+      res.writeHead(401, { "Content-Type": "application/json" }).end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Unauthorized: invalid or missing API key" },
+          id: null,
+        })
       );
       return;
     }

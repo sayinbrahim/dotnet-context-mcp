@@ -226,6 +226,32 @@ curl -X POST http://localhost:3000/mcp \
 
 **Known limitation**: because the same `McpServer` instance is (re)connected per request, two requests arriving concurrently can race — the second may see `"Already connected to a transport"` if it arrives before the first request's transport has disconnected. This is safe for local, single-client development and testing but is not safe for concurrent production traffic. A hosted deployment will need a transport/session pool (one `McpServer`+transport pair per in-flight request, or an equivalent) before this can serve real concurrent load — tracked as follow-up work, not solved here.
 
+### Authentication (optional)
+
+By default, the HTTP transport runs without authentication. For beta deployments, enable API key auth via CLI flag or environment variable:
+
+```bash
+dotnet-context-mcp --transport http --port 3000 --api-key YOUR_SECRET_KEY
+```
+
+Or via env var (useful for Docker):
+
+```bash
+DOTNET_CONTEXT_API_KEY=YOUR_SECRET_KEY dotnet-context-mcp --transport http --port 3000
+```
+
+Clients must send the key in the `X-API-Key` header:
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "X-API-Key: YOUR_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+**Do not deploy without authentication on a public network.**
+
 ## Docker
 
 Run dotnet-context-mcp as an HTTP server in a container:
