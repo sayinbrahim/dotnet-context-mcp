@@ -13,6 +13,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const cliArgs = process.argv.slice(2);
+
+if (cliArgs.includes("--version") || cliArgs.includes("-v")) {
+  const { version } = JSON.parse(
+    readFileSync(resolvePath(__dirname, "../package.json"), "utf-8")
+  ) as { version: string };
+  console.log(version);
+  process.exit(0);
+}
+
+if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
+  console.log(`dotnet-context-mcp - MCP server for .NET/EF Core solution analysis
+
+Usage:
+  dotnet-context-mcp [options]
+  dotnet-context-mcp <subcommand> [args]
+
+Options:
+  --transport <stdio|http>  Transport to use (default: stdio)
+  --port <number>           Port for HTTP transport (default: 3000)
+  --version, -v             Print the version and exit
+  --help, -h                Print this help message and exit
+
+Subcommands:
+  init-client               Configure an MCP client to use this server
+  list-dbcontexts           List EF Core DbContext classes
+  list-entities             List EF Core entity classes
+  list-migrations           List EF Core migrations
+  analyze-migration         Show Up/Down operations for a migration
+  list-relationships        List entity relationships
+  find-dbcontext-dependencies  Show DbContext DI registrations
+  analyze-solution-health   Aggregate EF Core health report
+  run-custom-analyzers      Run custom analyzer plugins
+  analyze-migration-safety  Run migration safety analyzers on one migration
+  get-solution-safety-report  Run migration safety analyzers across the solution
+`);
+  process.exit(0);
+}
+
 if (cliArgs[0] === "init-client") {
   const options: InitClientOptions = {
     client: [],

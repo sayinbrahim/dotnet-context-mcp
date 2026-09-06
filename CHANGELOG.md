@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0-alpha.3 (2026-08-25)
+
+### Fixed
+- **`--version` / `-v` flag** now prints the package version and exits, instead of silently starting the stdio server.
+- **`--help` / `-h` flag** added, prints usage information.
+
 ## v0.4.0-alpha.2 (2026-08-25)
 
 **⚠️ Alpha release**: HTTP transport is experimental and single-client only. Not for production. Install via `npm install dotnet-context-mcp@alpha`.
