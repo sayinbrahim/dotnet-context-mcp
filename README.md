@@ -226,6 +226,23 @@ curl -X POST http://localhost:3000/mcp \
 
 **Known limitation**: because the same `McpServer` instance is (re)connected per request, two requests arriving concurrently can race — the second may see `"Already connected to a transport"` if it arrives before the first request's transport has disconnected. This is safe for local, single-client development and testing but is not safe for concurrent production traffic. A hosted deployment will need a transport/session pool (one `McpServer`+transport pair per in-flight request, or an equivalent) before this can serve real concurrent load — tracked as follow-up work, not solved here.
 
+## Docker
+
+Run dotnet-context-mcp as an HTTP server in a container:
+
+```bash
+docker pull sayinbrahim/dotnet-context-mcp:alpha
+docker run -p 3000:3000 sayinbrahim/dotnet-context-mcp:alpha
+```
+
+The container listens on port 3000. Configure via:
+
+- `PORT` env var (default `3000`)
+
+Note: this is the HTTP transport, useful for hosted deployment or dev servers. For local Claude Code / Cursor use, prefer the npm install (stdio transport).
+
+The image is glibc-based (`node:22-slim`) because the bundled .NET CLI is a self-contained `linux-x64` build linked against glibc — it will not run on musl-based images like `node:22-alpine`.
+
 ## Known limitations
 
 - **Cold start**: First call takes 3–4 seconds (self-contained binary warm-up). Previously 15–20s with `dotnet run`.
