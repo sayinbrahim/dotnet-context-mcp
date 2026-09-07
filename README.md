@@ -257,8 +257,8 @@ curl -X POST http://localhost:3000/mcp \
 Run dotnet-context-mcp as an HTTP server in a container:
 
 ```bash
-docker pull sayinbrahim/dotnet-context-mcp:alpha
-docker run -p 3000:3000 sayinbrahim/dotnet-context-mcp:alpha
+docker pull 4322sayin/dotnet-context-mcp:alpha
+docker run -p 3000:3000 4322sayin/dotnet-context-mcp:alpha
 ```
 
 The container listens on port 3000. Configure via:
