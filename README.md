@@ -16,6 +16,24 @@ When Claude Code works on .NET projects, it reads files one at a time and infers
 
 This MCP server gives Claude **structured, Roslyn-backed access** to solution-level information. Questions like "what DbContexts exist", "what does this migration actually do", or "how are User and Order related" become single tool calls instead of multi-file searches.
 
+## Two ways to use
+
+**Local (free, open source)** — Install via npm, run on your machine:
+```
+npm install -g dotnet-context-mcp
+```
+
+**Hosted (managed, $19/dev/month, beta)** — Zero setup, always up-to-date, team-shared:
+
+- [Start Beta →](https://buy.polar.sh/polar_cl_Abth9SqpwUWe3BX5sfzRw0FRBryqNYQoc3Ezi0q6xAR)
+- Or read more: [Landing page](https://sayinbrahim.github.io/dotnet-context-cloud/)
+
+Both provide the same 11 MCP tools. Hosted adds:
+- No local install / .NET SDK needed
+- Team-shared endpoint (one URL, many developers)
+- Always latest version
+- Priority email support
+
 ## Architecture
 
 Two-layer bridge MCP design:
